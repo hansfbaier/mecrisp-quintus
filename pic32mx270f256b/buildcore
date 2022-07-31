@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Usage: buildcore forth-source precompiled-binary
+
+{
+   echo -e "compiletoflash\n"
+   cat "$1"
+   echo -e "compiletoflash here hex DABBAD00 !\n"
+   # cat -
+} | ./quintusemu-pic32mx270 mecrisp-quintus-pic32mx270f256b-boot.bin mecrisp-quintus-pic32mx270f256b-text.bin
+
+echo -e ""
+
+mv coredump.bin "$2"

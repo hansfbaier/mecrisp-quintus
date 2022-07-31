@@ -1,0 +1,3370 @@
+\ -----------------------------------------------------------------------------
+\   Conditional compilation
+\ -----------------------------------------------------------------------------
+\ ."  ok." added to nexttoken (for e4thcom compatibility) MM-201227
+
+\ Idea similar to http://lars.nocrew.org/dpans/dpansa15.htm#A.15.6.2.2532
+
+: nexttoken ( -- addr len )
+  begin
+    token          \ Fetch new token.
+  dup 0= while      \ If length of token is zero, end of line is reached.
+\   2drop cr query   \ Fetch new line.
+    2drop ."  ok." cr query  \ Tell the terminal or user to send a next line.
+  repeat
+;
+
+: [else] ( -- )
+  1 \ Initial level of nesting
+  begin
+    nexttoken ( level addr len )
+
+    2dup s" [if]"     compare
+ >r 2dup s" [ifdef]"  compare r> or
+ >r 2dup s" [ifndef]" compare r> or
+
+    if
+      2drop 1+  \ One more level of nesting
+    else
+      2dup s" [else]" compare
+      if
+        2drop 1- dup if 1+ then  \ Finished if [else] is reached in level 1. Skip [else] branch otherwise.
+      else
+        s" [then]" compare if 1- then  \ Level completed.
+      then
+    then
+
+    ?dup 0=
+  until
+
+  immediate 0-foldable
+;
+
+: [then] ( -- ) immediate 0-foldable ;
+
+: [if]   ( ? -- )                 0=  if postpone [else] then immediate 1-foldable ;
+: [ifdef]  ( -- ) token find drop 0=  if postpone [else] then immediate 0-foldable ;
+: [ifndef] ( -- ) token find drop 0<> if postpone [else] then immediate 0-foldable ;
+
+
+\ -----------------------------------------------------------------------------
+\
+\    Acrobatics - A register allocator for Mecrisp-Quintus
+\    Copyright (C) 2019  Matthias Koch
+\
+\    This program is free software: you can redistribute it and/or modify
+\    it under the terms of the GNU General Public License as published by
+\    the Free Software Foundation, either version 3 of the License, or
+\    (at your option) any later version.
+\
+\    This program is distributed in the hope that it will be useful,
+\    but WITHOUT ANY WARRANTY; without even the implied warranty of
+\    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+\    GNU General Public License for more details.
+\
+\    You should have received a copy of the GNU General Public License
+\    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+\
+\
+\  I am happy to share my first experimental release,
+\  but consider this code to be a highly experimental mess
+\  at this point in time.
+\
+\  How to use:
+\
+\    acro-on  ( -- ) Switch into the fresh compiler.
+\
+\    acro-off ( -- ) Go back to the classic compiler in the Forth core.
+\
+\    maximum-inlining ( -- ) Inline-Cache accepts up to 24 primitives+literals
+\    normal-inlining  ( -- ) Inline-Cache accepts up to  6 primitives+literals (default)
+\    no-inlining      ( -- ) Inline-Cache will not be written for definitions compiled in this mode
+\
+\    You can mix freely, with individual options for each definition separately.
+\
+\ -----------------------------------------------------------------------------
+
+\ Requires conditional.txt
+
+compiletoflash
+
+\ -----------------------------------------------------------------------------
+\  Tool for compressed instruction set on RV32IMC
+\ -----------------------------------------------------------------------------
+
+
+[ifdef] cj-encoding?
+
+0 variable opcode
+
+: rs1   ( -- u ) opcode @ 15 rshift $1F and ;
+: rs2   ( -- u ) opcode @ 20 rshift $1F and ;
+: rd    ( -- u ) opcode @  7 rshift $1F and ;
+: imm-i ( -- n ) opcode @ 20 arshift        ;
+: imm-s ( -- n ) opcode @ $FE000000 and 20 arshift
+                 opcode @ 7 rshift $1F and or ;
+
+: c-reg  ( n -- x ) 8 - 1-foldable ;
+: c-reg? ( n -- ? ) dup 8 u>= swap 15 u<= and 1-foldable ;
+
+: opcode, ( x -- ) opcode !
+
+\ opcode @ $FFF07FFF and $00000067 = \ JALR x0, rs1, 0
+\ if
+\   $8002 rs1 7 lshift or h, exit \ c.jr
+\ then
+\
+\ opcode @ , exit
+
+
+  \ ADDI4SPN : TODO
+
+  opcode @ $0000707F and $00002023 = \ SW
+  rs2 c-reg? and
+  rs1 c-reg? and
+  imm-s $FFFFFF83 and 0= and \ Passt die Konstante ins Format "65432__" ?
+  if
+    $C000 \ c.sw
+    rs1 c-reg 7 lshift or
+    rs2 c-reg 2 lshift or
+    imm-s %0000100 and 2 rshift  6 lshift or
+    imm-s %0111000 and 3 rshift 10 lshift or
+    imm-s %1000000 and 6 rshift  5 lshift or
+    h, exit
+  then
+
+  opcode @ $0000707F and $00002003 = \ LW
+  rd  c-reg? and
+  rs1 c-reg? and
+  imm-i $FFFFFF83 and 0= and \ Passt die Konstante ins Format "65432__" ?
+  if
+    $4000 \ c.lw
+    rs1 c-reg 7 lshift or
+    rd  c-reg 2 lshift or
+    imm-i %0000100 and 2 rshift  6 lshift or
+    imm-i %0111000 and 3 rshift 10 lshift or
+    imm-i %1000000 and 6 rshift  5 lshift or
+    h, exit
+  then
+
+  opcode @ $0000707F and $00002023 = \ SW ..., (x2)
+  rs1 2 = and
+  imm-s $FFFFFF03 and 0= and \ Passt die Konstante ins Format "765432__" ?
+  if
+    $C002
+    rs2 2 lshift or
+    imm-s %00111100 and 2 rshift  9 lshift or
+    imm-s %11000000 and 6 rshift  7 lshift or
+    h, exit
+  then
+
+  opcode @ $0000707F and $00002003 = \ LW ..., (x2)
+  rs1 2 = and
+  imm-i $FFFFFF03 and 0= and \ Passt die Konstante ins Format "765432__" ?
+  if
+    $4002
+    rd  7 lshift or
+    imm-i %00011100 and 2 rshift  4 lshift or
+    imm-i %00100000 and 5 rshift 12 lshift or
+    imm-i %11000000 and 6 rshift  2 lshift or
+    h, exit
+  then
+
+
+  opcode @ $FE00707F and $00001013 = \ SLLI
+  rd rs1 = and
+  rd 0<> and
+  if
+    $0002
+    rd 7 lshift or
+    opcode @ 20 rshift $1F and 2 lshift or
+    h, exit
+  then
+
+  opcode @ $FE00707F and $00005013 = \ SRLI
+  rd rs1 = and
+  rd c-reg? and
+  if
+    $8001
+    rd c-reg 7 lshift or
+    opcode @ 20 rshift $1F and 2 lshift or
+    h, exit
+  then
+
+  opcode @ $FE00707F and $40005013 = \ SRAI
+  rd rs1 = and
+  rd c-reg? and
+  if
+    $8401
+    rd c-reg 7 lshift or
+    opcode @ 20 rshift $1F and 2 lshift or
+    h, exit
+  then
+
+  opcode @ $0000707F and $00000013 = \ ADDI
+  rd rs1 = and \ Sind Quell- und Zielregister identisch ?
+  rd 0<> and \ Nicht der Null-Register ?
+  imm-i $FFFFFFE0 and dup $FFFFFFE0 = swap 0= or and \ Passt die Konstante in 6 Bits, inklusive Vorzeichen ?
+  if
+    imm-i 0= if exit then \ Konstante 0 darf nicht opcodiert werden. In dem Fall wird aber auch kein Befehl benötigt.
+    $0001
+    rd 7 lshift or
+    opcode @ 18 arshift $107C and or
+    h, exit
+  then
+
+  opcode @ $0000707F and $00007013 = \ ANDI
+  rd rs1 = and \ Sind Quell- und Zielregister identisch ?
+  rd c-reg? and
+  imm-i $FFFFFFE0 and dup $FFFFFFE0 = swap 0= or and \ Passt die Konstante in 6 Bits, inklusive Vorzeichen ?
+  imm-i 0<> and \ Konstante 0 darf nicht opcodiert werden.
+  if
+    $8801
+    rd c-reg 7 lshift or
+    opcode @ 18 arshift $107C and or
+    h, exit
+  then
+
+  opcode @ $FE00707F and $00000033 = \ ADD
+  rs1 0<> rs2 0<> and and             \ Beide Quellregister nicht Null ?
+  if                                   \ Ist einer der Quellregister mit dem Zielregister identisch ?
+    rs1 rd = if $9002 rd 7 lshift or rs2 2 lshift or h, exit then
+    rs2 rd = if $9002 rd 7 lshift or rs1 2 lshift or h, exit then
+  then
+
+  opcode @ $FE00707F and $40000033 = \ SUB
+  rs1 c-reg? rs2 c-reg? and and       \ Sind die Register kurz genug, um in den C-Befehl zu passen ?
+  if                                   \ Ist einer der Quellregister mit dem Zielregister identisch ?
+    rs1 rd = if $8C01 rd c-reg 7 lshift or rs2 c-reg 2 lshift or h, exit then
+  then
+
+  opcode @ $FE00707F and $00004033 = \ XOR
+  rs1 c-reg? rs2 c-reg? and and       \ Sind die Register kurz genug, um in den C-Befehl zu passen ?
+  if                                   \ Ist einer der Quellregister mit dem Zielregister identisch ?
+    rs1 rd = if $8C21 rd c-reg 7 lshift or rs2 c-reg 2 lshift or h, exit then
+    rs2 rd = if $8C21 rd c-reg 7 lshift or rs1 c-reg 2 lshift or h, exit then
+  then
+
+  opcode @ $FE00707F and $00006033 = \ OR
+  rs1 c-reg? rs2 c-reg? and and       \ Sind die Register kurz genug, um in den C-Befehl zu passen ?
+  if                                   \ Ist einer der Quellregister mit dem Zielregister identisch ?
+    rs1 rd = if $8C41 rd c-reg 7 lshift or rs2 c-reg 2 lshift or h, exit then
+    rs2 rd = if $8C41 rd c-reg 7 lshift or rs1 c-reg 2 lshift or h, exit then
+  then
+
+  opcode @ $FE00707F and $00007033 = \ AND
+  rs1 c-reg? rs2 c-reg? and and       \ Sind die Register kurz genug, um in den C-Befehl zu passen ?
+  if                                   \ Ist einer der Quellregister mit dem Zielregister identisch ?
+    rs1 rd = if $8C61 rd c-reg 7 lshift or rs2 c-reg 2 lshift or h, exit then
+    rs2 rd = if $8C61 rd c-reg 7 lshift or rs1 c-reg 2 lshift or h, exit then
+  then
+
+
+  opcode @ $FE00707F and $00006033 = \ OR
+  rd 0<> rs1 0<> rs2 0= and and and   \ im Sinne von MV verwendet als: or rd, rs1, zero
+  if                                   \ Es gibt noch viele weitere Varianten, aber der Acrobatics verwendet die OR-Variante fürs MV.
+    $8002 \ c.mv
+    rd  7 lshift or
+    rs1 2 lshift or
+    h, exit
+  then
+
+  opcode @ $FFF07FFF and $00000067 = \ JALR x0, rs1, 0
+  if
+    $8002 rs1 7 lshift or h, exit \ c.jr
+  then
+
+  opcode @ $FFF07FFF and $000000E7 = \ JALR x1, rs1, 0
+  if
+    $9002 rs1 7 lshift or h, exit \ c.jalr
+  then
+
+  opcode @ , \ Normalzustand: Unbekannte Opcodes unverändert schreiben
+;
+
+[else]
+
+: opcode, ( x -- ) , ;
+
+[then]
+
+\ -----------------------------------------------------------------------------
+\  Tools for building Opcodes
+\ -----------------------------------------------------------------------------
+
+2 constant rsp-register
+3 constant loop-index-register
+4 constant loop-limit-register
+8 constant tos-register
+9 constant psp-register
+
+[ifdef] mips
+
+31 constant link-register \ Link register is hardwired, just to give it a name
+
+: >source1       ( opcode register -- opcode* ) 21 lshift or 2-foldable ;
+: >source2       ( opcode register -- opcode* ) 16 lshift or 2-foldable ;
+: >destination-i ( opcode register -- opcode* ) 16 lshift or 2-foldable ;
+: >destination   ( opcode register -- opcode* ) 11 lshift or 2-foldable ;
+: >imm-i         ( opcode n        -- opcode* ) $FFFF and or 2-foldable ;
+: >imm-store     ( opcode offset   -- opcode* ) $FFFF and or 2-foldable ;
+: >imm-shift     ( opcode shift    -- opcode* ) $1F and 6 lshift or 2-foldable ;
+
+[else]
+
+1 constant link-register \ Link register is hardwired, just to give it a name
+
+: >source1       ( opcode register -- opcode* ) 15 lshift or 2-foldable ;
+: >source2       ( opcode register -- opcode* ) 20 lshift or 2-foldable ;
+: >destination-i ( opcode register -- opcode* )  7 lshift or 2-foldable ;
+: >destination   ( opcode register -- opcode* )  7 lshift or 2-foldable ;
+: >imm-i         ( opcode n        -- opcode* ) 20 lshift or 2-foldable ;
+: >imm-store     ( opcode offset   -- opcode* ) dup $1F and 7 lshift swap $FE0 and 20 lshift or or 2-foldable ;
+
+[then]
+
+\ -----------------------------------------------------------------------------
+\  Data structures for stack model
+\ -----------------------------------------------------------------------------
+
+-1 constant state-unknown
+-2 constant state-literal
+
+8 constant cached-d-elements \ Minimum: 2 Sinnvoll: ab 5
+5 constant cached-r-elements \ Minimum: 2 Sinnvoll: ab 3
+
+create canonical-state \ Adjust accordingly when changing the amount of cached elements.
+                       \ Tidyup code is hardwired for TOS in register and all others on stack = unknown.
+\ ---------------------------
+   tos-register , 0 , \ TOS
+  state-unknown , 0 , \ NOS
+  state-unknown , 0 , \ 3OS
+  state-unknown , 0 , \ 4OS
+  state-unknown , 0 , \ 5OS
+  state-unknown , 0 , \ 6OS
+  state-unknown , 0 , \ 7OS
+  state-unknown , 0 , \ 8OS
+\ ---------------------------
+  state-unknown , 0 , \ TOR
+  state-unknown , 0 , \ NOR
+  state-unknown , 0 , \ 3OR
+  state-unknown , 0 , \ 4OR
+  state-unknown , 0 , \ 5OR
+\ ---------------------------
+
+create register-list  \ Provide as many registers as you have cached stack elements. Take care of interrupt entry sequences when changing this !
+\ ---------------------------
+   tos-register , \ For performance reasons, the first register should be the canonical TOS register. Results default to this one.
+             14 , \ Registers 14 and 15 are temporary registers in the core code of Mecrisp-Quintus.
+             16 ,
+             17 ,
+             18 ,
+             19 ,
+             20 ,
+             21 ,
+             22 ,
+             23 ,
+             24 ,
+             25 ,
+  link-register , \ The usage of the link register for something else than the link is uncommon, but helps saving one push/pop pair on interrupt entry.
+\ ---------------------------
+
+15 constant temporary-register-for-acrobatics \ Specify which register to use for temporary things like lui lw/xori pairs.
+
+false variable temporary-bekannt
+    0 variable temporary-inhalt
+
+cached-d-elements cached-r-elements + constant cached-elements
+cached-elements 2* cells              constant ra-size
+
+ra-size buffer: ra-state
+
+: init-register-allocator ( -- )
+  canonical-state ra-state ra-size move
+  false temporary-bekannt !
+;
+
+\ -----------------------------------------------------------------------------
+\   A few handy shortcuts for accessing the state of certain elements
+\ -----------------------------------------------------------------------------
+
+: ->tos ( addr -- addr* ) 0 2* cells + 1-foldable ;
+: ->nos ( addr -- addr* ) 1 2* cells + 1-foldable ;
+\ : ->3os ( addr -- addr* ) 2 2* cells + 1-foldable ;
+
+: ->d-last ( addr -- addr* ) cached-d-elements 1- 2* cells + 1-foldable ;
+
+: ->tor ( addr -- addr* ) cached-d-elements 0 + 2* cells + 1-foldable ;
+\ : ->nor ( addr -- addr* ) cached-d-elements 1 + 2* cells + 1-foldable ;
+\ : ->3or ( addr -- addr* ) cached-d-elements 2 + 2* cells + 1-foldable ;
+
+: ->r-last ( addr -- addr* ) cached-d-elements cached-r-elements 1- + 2* cells + 1-foldable ;
+
+cached-d-elements     0                     2constant d-elements-increasing
+0                     cached-d-elements 1-  2constant d-elements-decreasing
+
+cached-d-elements     1                     2constant d-elements-increasing-without-tos
+1                     cached-d-elements 1-  2constant d-elements-decreasing-without-tos
+
+cached-elements       cached-d-elements     2constant r-elements-increasing
+cached-d-elements     cached-elements 1-    2constant r-elements-decreasing
+
+cached-elements       cached-d-elements 1+  2constant r-elements-increasing-without-tor
+cached-d-elements 1+  cached-elements 1-    2constant r-elements-decreasing-without-tor
+
+cached-elements       0                     2constant all-elements-increasing
+0                     cached-elements 1-    2constant all-elements-decreasing
+
+: element ( addr n -- addr* ) 2* cells + 2-foldable ;
+
+\ -----------------------------------------------------------------------------
+\   Insight for debugging
+\ -----------------------------------------------------------------------------
+
+  [ifdef] debug
+
+  : cura ( -- ) \ See you RA
+    cr
+
+    d-elements-increasing do
+      i u. ." : " ra-state i element 2@ hex. hex. cr
+    loop
+
+    cr
+
+    r-elements-increasing do
+      i cached-d-elements - u. ." : " ra-state i element 2@ hex. hex. cr
+    loop
+  ;
+
+  : cu ( -- ) cura 0-foldable ;
+
+  \ : ,  ( x -- ) cr here disasm-$ ! , disasm-step ;
+  \ : registerliteral, ( x reg -- ) cr ." Regliteral, " h.s registerliteral, h.s ;
+
+  [then]
+
+\ -----------------------------------------------------------------------------
+\   Tools to get multiple elements to the stack in an efficient way
+\ -----------------------------------------------------------------------------
+
+false variable opcode-adjust-stack
+false variable opcode-store-stack
+
+: select-opcodes-for-d-tidyup ( -- )
+  [ifdef] mips
+    $24000000 psp-register >destination-i psp-register >source1 opcode-adjust-stack ! \ addiu $9, $9, 0 Opcode
+    $AC000000 psp-register >source1                             opcode-store-stack  ! \ sw $zero, 0000($9) Opcode
+  [else]
+    $00000013 psp-register >destination   psp-register >source1 opcode-adjust-stack ! \ addi x9, x9, 0 Opcode
+    $00002023 psp-register >source1                             opcode-store-stack  ! \ sw x0, 0(x9) Opcode
+  [then]
+;
+
+: select-opcodes-for-r-tidyup ( -- )
+  [ifdef] mips
+    $24000000 rsp-register >destination-i rsp-register >source1 opcode-adjust-stack ! \ addiu $2, $2, 0 Opcode
+    $AC000000 rsp-register >source1                             opcode-store-stack  ! \ sw $zero, 0000($2) Opcode
+  [else]
+    $00000013 rsp-register >destination   rsp-register >source1 opcode-adjust-stack ! \ addi x2, x2, 0 Opcode
+    $00002023 rsp-register >source1                             opcode-store-stack  ! \ sw x0, 0(x2) Opcode
+  [then]
+;
+
+: tidyup-collect ( Anzahl Zustandsvariable -- ... Anzahl* )
+  dup @ state-unknown <> if
+    swap 1+ \ Ein Element mehr rauszuschreiben
+  else drop then
+;
+
+: get-element-into-register ( element -- register )
+    dup @ state-literal =
+    if
+      cell+ @
+      dup 0<> \ Literal 0 steht direkt als Register 0 zur Verfügung
+      if \ Get literal into register
+
+        dup temporary-inhalt @ = temporary-bekannt @ and
+        if
+          drop
+        else
+          dup temporary-inhalt ! true temporary-bekannt !
+          temporary-register-for-acrobatics registerliteral,
+        then
+
+        temporary-register-for-acrobatics
+
+      then
+    else
+      @  \ Get the register which contains what goes to the stack.
+    then
+;
+
+: tidyup-flush ( ... Anzahl -- )
+
+  \ Write addi opcode to adjust stack pointer
+  dup if
+    dup cells negate opcode-adjust-stack @ swap >imm-i opcode,
+  then
+
+  \ Write opcodes for all the elements which shall go to that stack.
+
+  0 ?do \ Schleife über die Elemente
+    get-element-into-register
+    opcode-store-stack @ swap
+    [ifdef] mips
+      >destination-i
+    [else]
+      >source2
+    [then]
+    i cells >imm-store \ Offset into stack
+    opcode,
+  loop
+;
+
+\ -----------------------------------------------------------------------------
+\   Tidyup. Fall back to canonical stack state from any state the stack model could be in.
+\   The design of this section is very critical for the overall performance of the resulting code.
+\ -----------------------------------------------------------------------------
+
+: move-opcode ( source-register destination-register -- )
+  2dup <>
+  if
+    [ifdef] mips
+    $00000025 swap >destination \ or $0, $0, $0
+    [else]
+    $00006033 swap >destination \ or x0, x0, x0
+    [then]
+              swap >source1 opcode,
+  else
+    2drop
+  then
+;
+
+: tidyup-ra ( -- )
+
+  \ Collect all writes to data stack in order to use a single opcode for stack adjustment only.
+
+  select-opcodes-for-d-tidyup
+  0 \ Number of elements to be written to stack so far...
+
+  d-elements-decreasing-without-tos do
+    ra-state i element tidyup-collect
+  -1 +loop
+
+  tidyup-flush \ All data stack elements with exception of TOS are written out to data stack now.
+
+  select-opcodes-for-r-tidyup
+  0 \ Number of elements to be written to stack so far...
+
+  r-elements-decreasing do
+    ra-state i element tidyup-collect
+  -1 +loop
+
+  tidyup-flush \ All elements are written out to return stack now.
+
+  \ Check if TOS is available in register as desired:
+
+    ra-state ->tos @ state-literal =    \ Load constant into TOS register
+    if
+
+      ra-state ->tos cell+ @ temporary-inhalt @ = temporary-bekannt @ and
+      if \ Ist das gewünschte Literal zufällig gerade in dem temporären Register ?
+        temporary-register-for-acrobatics canonical-state ->tos @ move-opcode
+      else
+        ra-state        ->tos cell+ @
+        canonical-state ->tos @ registerliteral,
+      then
+
+    else
+
+      ra-state ->tos @ state-unknown =     \ Load register from stack
+      if \ Same opcodes as in "drop"
+        [ifdef] mips
+          $8C000000 tos-register >destination-i psp-register >source1 opcode, \ lw $8, 0000($9)
+          $24000004 psp-register >destination-i psp-register >source1 opcode, \ addiu $9, $9, 0004
+        [else]
+          $00002003 tos-register >destination   psp-register >source1 opcode, \ lw     x8, 0 (x9)
+          $00400013 psp-register >destination   psp-register >source1 opcode, \ addi   x9, x9, 4
+        [then]
+        canonical-state ->tos @ ra-state ->tos !
+
+      else
+        ra-state ->tos @ canonical-state ->tos @ move-opcode  \ Move TOS into correct register, if required.
+      then
+
+   then
+
+  init-register-allocator \ Set state back to canonical state. It's simpler this way.
+
+  \ Canonical fallback completed.
+;
+
+
+\ -----------------------------------------------------------------------------
+\  Various stack model infrastructure tools
+\  to get one element at a time from and to the stack of your choice
+\ -----------------------------------------------------------------------------
+
+: d-tidyup ( element -- )
+  select-opcodes-for-d-tidyup
+  0 swap tidyup-collect
+  tidyup-flush
+;
+
+: r-tidyup ( element -- )
+  select-opcodes-for-r-tidyup
+  0 swap tidyup-collect
+  tidyup-flush
+;
+
+\ -----------------------------------------------------------------------------
+
+: befreie-tos ( -- )
+
+  ra-state ->d-last d-tidyup
+
+  d-elements-decreasing-without-tos do
+    ra-state i 1- element 2@
+    ra-state i    element 2!
+  -1 +loop
+
+  state-unknown ra-state ->tos !
+;
+
+: eliminiere-tos ( -- )
+
+  d-elements-increasing-without-tos do
+    ra-state i    element 2@
+    ra-state i 1- element 2!
+  loop
+
+  state-unknown ra-state ->d-last !
+;
+
+\ -----------------------------------------------------------------------------
+
+: befreie-tor ( -- )
+
+  ra-state ->r-last r-tidyup
+
+  r-elements-decreasing-without-tor do
+    ra-state i 1- element 2@
+    ra-state i    element 2!
+  -1 +loop
+
+  state-unknown ra-state ->tor !
+;
+
+: eliminiere-tor ( -- )
+
+  r-elements-increasing-without-tor do
+    ra-state i    element 2@
+    ra-state i 1- element 2!
+  loop
+
+  state-unknown ra-state ->r-last !
+;
+
+\ -----------------------------------------------------------------------------
+\  Flags für die Kompilation
+\ -----------------------------------------------------------------------------
+
+\ Flags, die auch im Kern genauso definiert sind und so bleiben müssen
+
+$0010 constant flag-immediate
+$0020 constant flag-inline
+
+$0030 constant flag-compileonly
+
+$0040 constant flag-foldable
+$000F constant flag-foldabilitymask
+
+$0080 constant flag-ramallot
+
+\ Flags, die hier neu hinzukommen (und beliebig verändert werden können)
+
+ $10000 constant flag-inlinecache
+ $20000 constant flag-allocator \ War mal $0200 in Mecrisp-Stellaris. Im Mecrisp-Quintus habe ich erweiterte Flag-Felder.
+ $40000 constant flag-finished  \ Zum eleganten Beenden der Kompilation
+ $80000 constant flag-literator  \ Tritt nur im Cache für die RA-Vererbung auf !
+
+$100000 constant flag-acro-only
+
+\ -----------------------------------------------------------------------------
+\  Inline-Cache aus Mecrisp-Stellaris RA
+\ -----------------------------------------------------------------------------
+
+24 constant maximum-inline-cache-length
+maximum-inline-cache-length 8 * buffer: inline-cache
+
+0 variable inline-cache-count
+
+6 variable current-inline-cache-length \ Start mit sinnvoller Standard-Cachegröße
+
+: set-inline-cache ( u -- ) maximum-inline-cache-length umin current-inline-cache-length ! ;
+
+: maximum-inlining ( -- ) maximum-inline-cache-length set-inline-cache ;
+: normal-inlining  ( -- )                           6 set-inline-cache ;
+: no-inlining      ( -- )                           0 set-inline-cache ;
+
+
+  [ifdef] debug
+    \ Deep insight for debugging
+
+    : cuic ( -- ) cr cr
+      inline-cache-count @ .
+      inline-cache
+      maximum-inline-cache-length 0 do
+        dup @ hex. 4 +
+        dup @ hex. 4 +
+        cr
+      loop
+      drop cr cr
+    ;
+
+    : see-ic ( -- )
+      ' skipdefinition
+
+      dup cr ." Zahl der Elemente: " @ dup . cr
+
+      dup maximum-inline-cache-length u> if drop exit then
+
+      0 ?do
+
+        [ifdef] name.
+          cell+ dup @ dup >r hex.
+          cell+ dup @ hex. r> name. cr
+        [else]
+          cell+ dup @ hex.
+          cell+ dup @ hex. cr
+        [then]
+      loop
+      drop
+      cr
+    ;
+  [then]
+
+: squash-inline-cache ( -- ) \ Definition soll keinen Inline-Cache bekommen.
+  -1 inline-cache-count !
+;
+
+: write-inline-cache ( -- )
+
+  inline-cache-count @ current-inline-cache-length @ u> if exit then \ Zu lang, nicht komplett erfasst ! Kann leider keine Optimiervererbungssequenz schreiben.
+  inline-cache-count @ 0 = if flag-foldable setflags exit then \ Leere Definition. Als 0-faltbar markieren, damit sie komplett wegoptimiert werden kann.
+
+  flag-inlinecache setflags
+
+  \ ." Write Inline Cache" cr cuic cr
+  \ ."  *InCa "
+
+  inline-cache
+  inline-cache-count @ dup ,
+  0 do
+    dup @ , 4 +
+    dup @ , 4 +
+  loop
+  drop
+;
+
+: add-to-inline-cache ( addr|literal flags -- )
+  \ Sollte noch Platz im Inline-Cache sein, füge dieses Paar hinzu. Ansonsten markiere die Definition als zu lang, um sie einfügen zu können.
+
+  inline-cache-count @ current-inline-cache-length @ u<
+  if
+    \ ." +Ca "
+    ( dup hex. ) inline-cache-count @ 8 * 4 + inline-cache + !
+    ( dup hex. ) inline-cache-count @ 8 *     inline-cache + !
+
+  else
+    \ ." xCA "
+    2drop
+  then
+
+  inline-cache-count @ -1 <> if 1 inline-cache-count +! then
+;
+
+\ -----------------------------------------------------------------------------
+\  RA infrastructure
+\ -----------------------------------------------------------------------------
+
+: registerfrei? ( reg -- reg ? )
+
+  all-elements-increasing do
+    dup ra-state i element @ = if unloop false exit then
+  loop
+
+  true
+;
+
+: get-free-register ( -- reg )
+
+  all-elements-increasing do
+    register-list i cells + @ registerfrei? if unloop exit else drop then
+  loop
+
+  ." Keine freien Register vorhanden, Fehler im RA !" quit
+;
+
+: expect-one-r-element ( -- )
+  ra-state ->tor @ state-unknown =
+  if
+    get-free-register
+    dup ra-state ->tor !
+    [ifdef] mips
+      $8C000000         swap >destination-i rsp-register >source1 opcode, \ lw $0, 0000($2)
+      $24000004 rsp-register >destination-i rsp-register >source1 opcode, \ addiu $2, $2, 0004
+    [else]
+      $00002003         swap >destination   rsp-register >source1 opcode, \ lw     x0, 0 (x2)
+      $00400013 rsp-register >destination   rsp-register >source1 opcode, \ addi   x2, x2, 4
+    [then]
+  then
+;
+
+: expect-one-element ( -- )
+  ra-state ->tos @ state-unknown =
+  if
+    get-free-register
+    dup ra-state ->tos !
+    [ifdef] mips
+      $8C000000         swap >destination-i psp-register >source1 opcode, \ lw $0, 0000($9)
+      $24000004 psp-register >destination-i psp-register >source1 opcode, \ addiu $9, $9, 0004
+    [else]
+      $00002003         swap >destination   psp-register >source1 opcode, \ lw     x0, 0 (x9)
+      $00400013 psp-register >destination   psp-register >source1 opcode, \ addi   x9, x9, 4
+    [then]
+  then
+;
+
+: expect-two-elements ( -- )
+
+  ra-state ->tos @ state-unknown =
+  if \ TOS und NOS müssen nachgeladen werden.
+     \ Der Fall, dass TOS auf dem Stack ist, aber NOS im Register, sollte niemals auftreten.
+
+    get-free-register
+    dup ra-state ->tos !
+    [ifdef] mips
+      $8C000000         swap >destination-i psp-register >source1 opcode, \ lw $0, 0000($9)
+    [else]
+      $00002003         swap >destination   psp-register >source1 opcode, \ lw   x0, 0 (x9)
+    [then]
+
+    get-free-register
+    dup ra-state ->nos !
+    [ifdef] mips
+      $8C000004         swap >destination-i psp-register >source1 opcode, \ lw $0, 0004($9)
+      $24000008 psp-register >destination-i psp-register >source1 opcode, \ addiu $9, $9, 0008
+    [else]
+      $00402003         swap >destination   psp-register >source1 opcode, \ lw     x0, 4 (x9)
+      $00800013 psp-register >destination   psp-register >source1 opcode, \ addi   x9, x9, 8
+    [then]
+
+  else \ TOS ist belegt, aber NOS muss vielleicht nachgeladen werden.
+
+    ra-state ->nos @ state-unknown =
+    if
+      get-free-register
+      dup ra-state ->nos !
+      [ifdef] mips
+        $8C000000         swap >destination-i psp-register >source1 opcode, \ lw $0, 0000($9)
+        $24000004 psp-register >destination-i psp-register >source1 opcode, \ addiu $9, $9, 0004
+      [else]
+        $00002003         swap >destination   psp-register >source1 opcode, \ lw     x0, 0 (x9)
+        $00400013 psp-register >destination   psp-register >source1 opcode, \ addi   x9, x9, 4
+      [then]
+    then
+
+  then
+;
+
+: constant-to-tos ( -- ) \ Wenn NOS gefüllt ist, muss es TOS auch sein.
+
+  ra-state ->nos @ state-literal =
+  if
+    ra-state ->nos 2@
+       ra-state ->tos 2@
+       ra-state ->nos 2!
+    ra-state ->tos 2!
+  then
+;
+
+: expect-element-in-register ( element -- )
+  dup @ state-literal = \ If it is a constant, get it into a free register.
+  if
+    dup cell+ @ 0<>
+    if
+      get-free-register over !
+      dup cell+ @ \ Konstante
+      over @ \ Register
+      registerliteral,
+    else \ Literal 0 steht direkt als Register 0 zur Verfügung
+      0 over !
+    then
+  then
+  drop
+;
+
+\ -----------------------------------------------------------------------------
+\  Baukasten für die "selbstoptimierenden" Definitionen
+\ -----------------------------------------------------------------------------
+
+: allocator: ( -- )
+  postpone exit
+
+  [ifdef] mips
+    $2400FFFC  rsp-register >destination-i rsp-register >source1 opcode, \ addiu $2, $2, FFFC
+    $AC000000 link-register >destination-i rsp-register >source1 opcode, \ sw $31, 0000($2)
+  [else]
+    $FFC00013  rsp-register >destination   rsp-register >source1 opcode, \ addi   x2, x2, -4
+    $00002023 link-register >source2       rsp-register >source1 opcode, \ sw     x1, 0 (x2)
+  [then]
+
+  flag-allocator setflags
+
+immediate ;
+
+: acro-only ( -- ) flag-acro-only setflags immediate 0-foldable ;
+
+\ -----------------------------------------------------------------------------
+\  Helferlein für die kommenden Allokator-Optimierungsfälle
+\ -----------------------------------------------------------------------------
+
+[ifdef] mips
+
+  : tossigned16bitliteral? ( -- x true | false )
+
+     ra-state ->tos cell+ @ $FFFF8000 and dup $FFFF8000 = swap 0= or
+     ra-state ->tos @ state-literal =
+     and
+     if
+       ra-state ->tos cell+ @
+       true
+     else
+       false
+     then
+  ;
+
+  : tosunsigned16bitliteral? ( -- x true | false )
+
+     ra-state ->tos cell+ @ $FFFF0000 and 0=
+     ra-state ->tos @ state-literal =
+     and
+     if
+       ra-state ->tos cell+ @
+       true
+     else
+       false
+     then
+  ;
+
+
+[else]
+
+  : tos12bitliteral? ( -- x true | false )
+
+     ra-state ->tos cell+ @ $FFFFF800 and dup $FFFFF800 = swap 0= or
+     ra-state ->tos @ state-literal =
+     and
+     if
+       ra-state ->tos cell+ @
+       true
+     else
+       false
+     then
+  ;
+
+[then]
+
+\ -----------------------------------------------------------------------------
+
+[ifdef] mips
+
+  : ra-rechenlogik-unsigned ( Immediate-Opcode Register-Opcode -- )
+
+    2>r
+
+    tosunsigned16bitliteral?
+
+    if
+      ( Konstante ) $FFFF and
+      rdrop r> or
+
+      ra-state ->nos expect-element-in-register
+
+      ra-state ->nos @ >source1
+
+      eliminiere-tos
+      eliminiere-tos
+
+      befreie-tos
+      get-free-register
+      dup ra-state ->tos !
+
+      >destination-i opcode,
+
+    else
+
+      ra-state ->tos expect-element-in-register
+      r> rdrop
+      ra-state ->tos @ >source2
+
+      ra-state ->nos expect-element-in-register
+
+      ra-state ->nos @ >source1
+
+      eliminiere-tos
+      eliminiere-tos
+
+      befreie-tos
+      get-free-register
+      dup ra-state ->tos !
+
+      >destination opcode,
+    then
+  ;
+
+  : ra-rechenlogik-signed ( Immediate-Opcode Register-Opcode -- )
+
+    2>r
+
+    tossigned16bitliteral?
+
+    if
+      ( Konstante ) $FFFF and
+      rdrop r> or
+
+      ra-state ->nos expect-element-in-register
+
+      ra-state ->nos @ >source1
+
+      eliminiere-tos
+      eliminiere-tos
+
+      befreie-tos
+      get-free-register
+      dup ra-state ->tos !
+
+      >destination-i opcode,
+
+    else
+
+      ra-state ->tos expect-element-in-register
+      r> rdrop
+      ra-state ->tos @ >source2
+
+      ra-state ->nos expect-element-in-register
+
+      ra-state ->nos @ >source1
+
+      eliminiere-tos
+      eliminiere-tos
+
+      befreie-tos
+      get-free-register
+      dup ra-state ->tos !
+
+      >destination opcode,
+    then
+  ;
+
+[else]
+
+  : ra-rechenlogik-signed ( Immediate-Opcode Register-Opcode -- )
+
+    2>r
+
+    tos12bitliteral?
+
+    if
+      ( Konstante ) 20 lshift
+      rdrop r> or
+    else
+      ra-state ->tos expect-element-in-register
+      r> rdrop
+      ra-state ->tos @ >source2
+    then
+
+    ra-state ->nos expect-element-in-register
+
+    ra-state ->nos @ >source1
+
+    eliminiere-tos
+    eliminiere-tos
+
+    befreie-tos
+    get-free-register
+    dup ra-state ->tos !
+
+    >destination opcode,
+  ;
+
+  : ra-rechenlogik-unsigned ( Immediate-Opcode Register-Opcode -- ) ra-rechenlogik-signed ;
+
+[then]
+
+: ra-rechenlogik-plus ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+  constant-to-tos \ Kommutativ, also Konstante -> TOS.
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @             0 = and
+  if 2drop eliminiere-tos exit then
+
+  ra-rechenlogik-signed
+;
+
+: ra-rechenlogik-minus ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @             0 = and
+  if 2drop eliminiere-tos exit then
+
+  ra-state ->tos @ state-literal =
+  if
+    ra-state ->tos cell+ dup   @ negate swap !  \ Konstante für ADDI-Opcode vorbereiten
+
+    \ Auf addi(u) / add(u) Opcodes umschalten, damit die negierte Konstante korrekt bearbeitet wird
+    [ifdef] mips
+      2drop $24000000 $00000021 \ addiu $0, $0, 0  addu $0, $0, $0
+    [else]
+      2drop $00000013 $00000033 \  addi x0, x0, 0  add x0, x0, x0
+    [then]
+  then
+
+  ra-rechenlogik-signed
+;
+
+: ra-rechenlogik-xor ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+  constant-to-tos \ Kommutativ, also Konstante -> TOS.
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @             0 = and
+  if 2drop eliminiere-tos exit then
+
+  ra-rechenlogik-unsigned
+;
+
+: ra-rechenlogik-or ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+  constant-to-tos \ Kommutativ, also Konstante -> TOS.
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @             0 = and
+  if 2drop eliminiere-tos exit then
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @            -1 = and
+  if 2drop  ra-state ->tos 2@ ra-state ->nos 2! eliminiere-tos exit then
+
+  ra-rechenlogik-unsigned
+;
+
+: ra-rechenlogik-and ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+  constant-to-tos \ Kommutativ, also Konstante -> TOS.
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @            -1 = and
+  if 2drop eliminiere-tos exit then
+
+  ra-state ->tos       @ state-literal =
+  ra-state ->tos cell+ @             0 = and
+  if 2drop  ra-state ->tos 2@ ra-state ->nos 2! eliminiere-tos exit then
+
+  ra-rechenlogik-unsigned
+;
+
+: ra-rechenlogik-slt(u) ( Immediate-Opcode Register-Opcode -- )
+  expect-two-elements
+  ra-rechenlogik-signed
+;
+
+[ifdef] mips
+
+  : ra-rechenlogik-schieben ( Immediate-Opcode Register-Opcode -- )
+    expect-two-elements
+
+    ra-state ->tos @ state-literal =
+    if
+      $1F not ra-state ->tos cell+ bic!  \ Maximale Schubweite von 31 maskieren.
+    then
+
+    ra-state ->tos       @ state-literal =
+    ra-state ->tos cell+ @             0 = and
+    if 2drop eliminiere-tos exit then
+
+    2>r
+
+    ra-state ->tos @ state-literal =
+
+    if
+      rdrop r> ( Opcode )
+      ra-state ->tos cell+ @ >imm-shift
+
+      ra-state ->nos expect-element-in-register
+      ra-state ->nos @ >source2
+
+    else
+
+      ra-state ->tos expect-element-in-register
+      r> rdrop ( Opcode )
+      ra-state ->tos @ >source2
+
+      ra-state ->nos expect-element-in-register
+      ra-state ->nos @ >source1
+    then
+
+    eliminiere-tos
+    eliminiere-tos
+
+    befreie-tos
+    get-free-register
+    dup ra-state ->tos !
+
+    >destination opcode,
+  ;
+
+[else]
+
+  : ra-rechenlogik-schieben ( Immediate-Opcode Register-Opcode -- )
+    expect-two-elements
+
+    ra-state ->tos @ state-literal =
+    if
+      $1F not ra-state ->tos cell+ bic!  \ Maximale Schubweite von 31 maskieren.
+    then
+
+    ra-state ->tos       @ state-literal =
+    ra-state ->tos cell+ @             0 = and
+    if 2drop eliminiere-tos exit then
+
+    ra-rechenlogik-signed
+  ;
+
+[then]
+
+\ -----------------------------------------------------------------------------
+
+: ra-rechenlogik-muldiv ( Opcode -- )
+
+  expect-two-elements
+  ra-state ->tos expect-element-in-register
+  ra-state ->nos expect-element-in-register
+
+  ra-state ->nos @ >source1
+  ra-state ->tos @ >source2
+
+  eliminiere-tos eliminiere-tos
+  befreie-tos
+
+  get-free-register dup ra-state ->tos !
+
+  >destination opcode,
+;
+
+\ -----------------------------------------------------------------------------
+
+: lui-temporary ( literal -- )
+
+  [ifdef] mips $FFFF0000 and [else] $FFFFF000 and [then]
+
+  dup temporary-inhalt @ = temporary-bekannt @ and
+  if
+    drop
+  else
+    dup temporary-inhalt ! true temporary-bekannt !
+    [ifdef] mips
+      16 rshift $3C000000 or \ lui $0, 0
+    [else]
+      $00000037 or \ lui x0, 0
+    [then]
+    temporary-register-for-acrobatics >destination-i
+    opcode,
+  then
+;
+
+: ra-speicherlesen ( Opcode )
+  expect-one-element
+
+  ra-state ->tos @ state-literal =
+  if \ Literals können mit Speicherlese-Opcodes bequem gehandhabt werden.
+
+    [ifdef] mips tossigned16bitliteral? [else] tos12bitliteral? [then]
+    if \ Kurzes Literal, passt direkt in einen Lade-Opcode mit Zero-Register.
+      >imm-i
+    else \ Langes Literal, passt nicht in den Opcode hinein. Kann aber jede Adresse mit zwei Opcodes laden.
+
+      ra-state ->tos cell+ @
+      [ifdef] mips
+        dup $8000 and if $10000 + then \ Korrektur fürs negative Vorzeichen bei der Addition
+      [else]
+        dup  $800 and if  $1000 + then \ Korrektur fürs negative Vorzeichen bei der Addition
+      [then]
+      ( Opcode Literal* )
+
+      dup lui-temporary \ Lui-Opcode generieren
+
+      >imm-i \ Konstante für den Lade-Opcode einpflegen
+      temporary-register-for-acrobatics >source1 \ und den im LUI-Opcode verwendeten Register einfügen.
+
+    then
+  else
+    ra-state ->tos @ >source1
+  then
+
+  \ Zielregister in den Opcode einfügen
+
+  eliminiere-tos
+  befreie-tos
+
+  get-free-register
+  dup ra-state ->tos !
+
+  >destination-i
+  opcode,
+
+  [ifdef] mips
+    $00000000 opcode, \ Insert NOP opcode for load delay slot.
+  [then]
+;
+
+\ -----------------------------------------------------------------------------
+
+: ra-speicherschreiben ( Opcode )
+  expect-two-elements
+  ra-state ->nos expect-element-in-register
+
+  ra-state ->tos @ state-literal =
+  if \ Literals können mit Speicherschreibe-Opcodes bequem gehandhabt werden.
+
+    [ifdef] mips tossigned16bitliteral? [else] tos12bitliteral? [then]
+    if \ Kurzes Literal, passt direkt in einen Schreib-Opcode mit Zero-Register.
+      >imm-store
+    else \ Langes Literal, passt nicht in den Opcode hinein. Kann aber jede Adresse mit zwei Opcodes beschreiben.
+
+      ra-state ->tos cell+ @
+      [ifdef] mips
+        dup $8000 and if $10000 + then \ Korrektur fürs negative Vorzeichen bei der Addition
+      [else]
+        dup  $800 and if  $1000 + then \ Korrektur fürs negative Vorzeichen bei der Addition
+      [then]
+      ( Opcode Literal* )
+
+      dup lui-temporary \ Lui-Opcode generieren
+
+      >imm-store \ Konstante für den Schreib-Opcode einpflegen
+      temporary-register-for-acrobatics >source1 \ und den im LUI-Opcode verwendeten Register einfügen.
+
+    then
+  else
+    ra-state ->tos @ >source1
+  then
+
+  ra-state ->nos @ [ifdef] mips >destination-i [else] >source2 [then]
+  opcode,
+
+  eliminiere-tos eliminiere-tos
+;
+
+\ -----------------------------------------------------------------------------
+\  RA Stackjongleure
+\ -----------------------------------------------------------------------------
+
+: dup ( x -- x x ) dup inline 1-foldable acro-only
+
+allocator:
+ expect-one-element
+ befreie-tos
+ ra-state ->nos 2@ ra-state ->tos 2!
+;
+
+: swap ( x1 x2 -- x2 x1 ) swap inline 2-foldable acro-only
+
+allocator:
+ expect-two-elements
+ ra-state ->nos 2@
+    ra-state ->tos 2@
+    ra-state ->nos 2!
+ ra-state ->tos 2!
+;
+
+: drop ( x -- ) drop inline 1-foldable acro-only
+
+allocator:
+  ra-state ->tos @ state-unknown =
+  if
+    [ifdef] mips
+      $24000004 psp-register >destination-i psp-register >source1 opcode, \ addiu $9, $9, 0004
+    [else]
+      $00400013 psp-register >destination   psp-register >source1 opcode, \ addi x9, x9, 4
+    [then]
+  else
+    eliminiere-tos
+  then
+;
+
+: rdrop ( -- ) ( R: x -- ) rdrop inline acro-only
+
+allocator:
+  ra-state ->tor @ state-unknown =
+  if
+    [ifdef] mips
+      $24000004 rsp-register >destination-i rsp-register >source1 opcode, \ addiu $2, $2, 0004
+    [else]
+      $00400013 rsp-register >destination   rsp-register >source1 opcode, \ addi x2, x2, 4
+    [then]
+  else
+    eliminiere-tor
+  then
+;
+
+: >r ( x -- ) ( R: -- x ) >r inline acro-only
+
+allocator:
+  expect-one-element
+  befreie-tor
+  ra-state ->tos 2@ ra-state ->tor 2!
+  eliminiere-tos
+;
+
+: r@ ( -- x ) ( R: x -- x ) r@ inline acro-only
+
+allocator:
+  expect-one-r-element
+  befreie-tos
+  ra-state ->tor 2@ ra-state ->tos 2!
+;
+
+: r> ( -- x ) ( R: x -- ) r> inline acro-only
+
+allocator:
+  expect-one-r-element
+  befreie-tos
+  ra-state ->tor 2@ ra-state ->tos 2!
+  eliminiere-tor
+;
+
+: i ( -- i ) i inline acro-only
+
+allocator:
+  befreie-tos
+  loop-index-register ra-state ->tos ! \ Der Schleifen-Index-Register
+;
+
+\ -----------------------------------------------------------------------------
+\   Tick the flags of a definition
+\ -----------------------------------------------------------------------------
+
+:  'f  ( -- flags ) token find nip ;
+: ['f] ( -- flags )  'f 0-foldable ;
+
+\ -----------------------------------------------------------------------------
+\  Compiler aus Mecrisp-Ice mit Konstantenfaltung
+\ -----------------------------------------------------------------------------
+
+: on  ( addr -- ) true swap ! ;
+: off ( addr -- ) false swap ! ;
+
+true variable constantfoldingpointer
+
+\ -----------------------------------------------------------------------------
+
+: one-constant->stackmodel ( x -- )
+    befreie-tos
+    state-literal ra-state ->tos !
+                  ra-state ->tos cell+ !
+;
+
+: flushconstants ( n*x count -- {n-1}*x count-1 ) \ Recursive to write them out in reverse order
+  dup if \ Do nothing if count is zero
+    dup    1 u> if 1- swap >r recurse r> swap then
+    swap   dup flag-literator add-to-inline-cache   one-constant->stackmodel
+  then
+;
+
+: constants->stackmodel ( n -- )  flushconstants drop ;
+
+\ -----------------------------------------------------------------------------
+
+: flushback ( element-on-d-stack -- element-on-d-stack )
+  dup cached-d-elements = if exit then
+
+  ra-state over element @ state-literal =
+  if
+    ra-state over element cell+ @
+    >r
+      1+ recurse 1-
+    r> swap
+
+    ['] drop ['f] drop add-to-inline-cache \ Flushed back constants need to be dropped at replay of the inline cache, too.
+    eliminiere-tos \ Element von oben vernichten.
+  then
+;
+
+: stackmodel->constants ( -- ) 0 flushback drop ; \ Flush back constants from the stack model to the data stack.
+
+\ -----------------------------------------------------------------------------
+
+: kompilator ( addr flags -- )
+
+  dup flag-inlinecache and
+  if \ Wenn die Optimiersequenz geschrieben worden ist, ist auch mindestens ein Element darin vorhanden.
+    drop ( addr ) skipdefinition
+
+          dup @ ( Cache-Start Zahl-der-Elemente )
+          swap 4 + swap
+          0 do
+            >r
+            r@     @   \ Addr
+            r@ 4 + @   \ Flags
+            recurse
+            r> 8 +
+          loop
+          drop
+
+  exit then
+
+  constantfoldingpointer @ true =  \ If it is not set, initialise constant folding pointer
+  if depth    2 - constantfoldingpointer ! then \ Do not include the values of parse-name
+
+  dup flag-literator and if drop exit then \ Literator-Konstanten einfach für die Faltung auf dem Stack liegen lassen.
+
+          2>r \ Move addr and flags out of the way
+
+          \ Calculate how many constants are available
+          depth                       \ Calculate how many
+          constantfoldingpointer @ -  \ constants are available now
+          ( #constants R: xt imm-flag ) \ Number of constants available now on stack
+
+
+          dup r@ flag-foldabilitymask and u>= \ Check if there are enough constants left
+              r@ flag-foldable and 0<> and    \ Check if the current definition is foldable
+
+          r@ flag-ramallot and 0<> or \ Ramallot is foldable, too, but the lower bits have a different meaning.
+
+          if \ Fold it !
+            drop
+            2r> drop execute
+          else \ Not foldable or not enough constants available
+
+            r@ flag-allocator and
+            if
+            \ Does the definition carry code which allows optimisations based on the stack model ?
+
+              constants->stackmodel          \ Move remaining constants into the stack model
+
+              2r@ nip flag-finished and
+              if
+                2r> drop skipdefinition execute \ Definition will be finalised in ;
+              else
+                2r@ add-to-inline-cache        \ Add definition to inline cache
+                2r> drop skipdefinition execute \ Allocator entry is at the end of the definition
+                depth constantfoldingpointer !   \ Update constant folding pointer to current location on stack
+                stackmodel->constants             \ and flush back constants that were temporarily stored in the stack model.
+              then
+
+            else
+
+              \ Write the constants and flush all pending register operations in order to reach canonical stack state
+              constants->stackmodel
+              tidyup-ra
+
+              \ Add definition to inline cache:
+              \ 2r@ add-to-inline-cache
+              \ No inline cache for definitions complied the classic way. It won't give any optimisation benefits, but waste space.
+              squash-inline-cache
+
+              \ No folding allowed over classic compilation
+              constantfoldingpointer on
+
+              2r>
+
+              \ Do classic compilation
+              dup flag-immediate and
+              if   drop execute
+              else flag-inline and if inline, else call, then
+              then
+
+            then
+          then
+;
+
+: kompilator-set-acro-only-flag ( addr flags -- ) flag-acro-only setflags kompilator ;
+
+
+: acro-interpret
+
+    begin
+        token
+        dup
+    while
+      constantfoldingpointer @ true =  \ If it is not set, initialise constant folding pointer
+      if depth    2 - constantfoldingpointer ! then \ Do not include the values of parse-name
+
+      2dup 2>r ( addr len R: addr len )
+      find \ Try to find the definition in dictionary
+      over 0<>
+      if ( addr flags ) \ Found.
+
+        state @
+        if    \ Compile mode
+         2rdrop
+         kompilator
+        else  \ Execute mode
+          flag-compileonly and flag-compileonly = if 2r> type ."  is compile only." cr quit else 2rdrop then
+          constantfoldingpointer on
+          execute
+        then
+
+      else ( addr flags R: addr len ) \ Not found ? Perhaps it is a number.
+        2drop
+        2r@ number 0= if space 2r> type ."  not found." cr quit else 2rdrop then \ Leave the literal(s) on the stack
+      then
+
+    repeat
+    2drop
+;
+
+\ -----------------------------------------------------------------------------
+\  Die Einfügung des Akrobatikcompiler
+\ -----------------------------------------------------------------------------
+
+'f words 0< 0= constant flag-invisible
+
+: classic-find ( address length -- Code-Adresse Flags )
+  \ This is a special find to make the acro-only flagged definitions invisible while using the classic compiler.
+
+  2>r
+
+  0 0 \ Not found.
+
+  dictionarystart
+  begin
+    ( Code-Addr Flags Dictionary-Chain R: addr len )
+
+    dup 4 + @ flag-invisible <>
+    if
+    dup 4 + @ flag-allocator flag-acro-only or and 0=
+    if
+
+      dup 8 + count 2r@ compare
+      if
+        -rot 2drop
+        dup 8 + skipstring
+        over 4 + @ \ Flags
+        rot
+
+        dup addrinram? if drop 2rdrop exit then
+      then
+
+    then
+    then
+
+    dictionarynext
+  until
+  drop
+
+  2rdrop
+;
+
+: acro-on  ( ... -- ) [']        (find) hook-find ! ['] acro-interpret  hook-interpret ! ;
+: acro-off ( ... -- ) ['] classic-find  hook-find ! [']     (interpret) hook-interpret ! ;
+
+: welcome-to-acrobatics ( -- ) ." Acrobatics - A register allocator for Mecrisp-Quintus" cr ;
+
+\ -----------------------------------------------------------------------------
+\  Die ganzen vom Prozessor bereitgestellten und für Forth nützlichen Opcodes
+\ -----------------------------------------------------------------------------
+
+[ifdef] mips
+
+  : +        ( x1 x2 -- x )        +  inline 2-foldable acro-only allocator: $24000000 $00000021 ra-rechenlogik-plus         ; \ addiu $0, $0, 0  addu $0, $0, $0
+  : -        ( x1 x1 -- x )        -  inline 2-foldable acro-only allocator: $24000000 $00000023 ra-rechenlogik-minus        ; \ addiu $0, $0, 0  subu $0, $0, $0
+  : xor      ( x1 x2 -- x )      xor  inline 2-foldable acro-only allocator: $38000000 $00000026 ra-rechenlogik-xor          ; \ xori  $0, $0, 0  xor  $0, $0, $0
+  : or       ( x1 x2 -- x )       or  inline 2-foldable acro-only allocator: $34000000 $00000025 ra-rechenlogik-or           ; \ ori   $0, $0, 0  or   $0, $0, $0
+  : and      ( x1 x2 -- x )      and  inline 2-foldable acro-only allocator: $30000000 $00000024 ra-rechenlogik-and          ; \ andi  $0, $0, 0  and  $0, $0, $0
+
+  : lshift   ( x1 x2 -- x )   lshift  inline 2-foldable acro-only allocator: $00000000 $00000004 ra-rechenlogik-schieben     ; \ sll   $0, $0, 0  sllv $0, $0, $0
+  : rshift   ( x1 x2 -- x )   rshift  inline 2-foldable acro-only allocator: $00000002 $00000006 ra-rechenlogik-schieben     ; \ srl   $0, $0, 0  srlv $0, $0, $0
+  : arshift  ( x1 x2 -- x )  arshift  inline 2-foldable acro-only allocator: $00000003 $00000007 ra-rechenlogik-schieben     ; \ sra   $0, $0, 0  srav $0, $0, $0
+
+  : slt      ( x1 x2 -- x )     slt          2-foldable acro-only allocator: $28000000 $0000002A ra-rechenlogik-slt(u)       ; \ slti  $0, $0, 0  slt  $0, $0, $0
+  : sltu     ( x1 x2 -- x )     sltu         2-foldable acro-only allocator: $2C000000 $0000002B ra-rechenlogik-slt(u)       ; \ sltiu $0, $0, 0  sltu $0, $0, $0
+
+  : c@signed ( addr  -- x )  c@signed inline            acro-only allocator: $80000000           ra-speicherlesen            ; \ lb $0, 0($0)
+  : h@signed ( addr  -- x )  h@signed inline            acro-only allocator: $84000000           ra-speicherlesen            ; \ lh $0, 0($0)
+  :  @       ( addr  -- x )   @       inline            acro-only allocator: $8C000000           ra-speicherlesen            ; \ lw $0, 0($0)
+  : c@       ( addr  -- x )  c@       inline            acro-only allocator: $90000000           ra-speicherlesen            ; \ lbu $0, 0($0)
+  : h@       ( addr  -- x )  h@       inline            acro-only allocator: $94000000           ra-speicherlesen            ; \ lhu $0, 0($0)
+
+  : c!       ( x addr --  )  c!       inline            acro-only allocator: $A0000000           ra-speicherschreiben        ; \ sb $0, 0($0)
+  : h!       ( x addr --  )  h!       inline            acro-only allocator: $A4000000           ra-speicherschreiben        ; \ sh $0, 0($0)
+  :  !       ( x addr --  )   !       inline            acro-only allocator: $AC000000           ra-speicherschreiben        ; \ sw $0, 0($0)
+
+  : *        ( x1 x2 -- x )   *       inline 2-foldable acro-only allocator: $70000002           ra-rechenlogik-muldiv       ; \ mul   $0, $0, $0
+
+[else]
+
+  : +        ( x1 x2 -- x )        +  inline 2-foldable acro-only allocator: $00000013 $00000033 ra-rechenlogik-plus         ; \ addi x0, x0, 0  add x0, x0, x0
+  : -        ( x1 x1 -- x )        -  inline 2-foldable acro-only allocator: $00000013 $40000033 ra-rechenlogik-minus        ; \ addi x0, x0, 0  sub x0, x0, x0
+  : xor      ( x1 x2 -- x )      xor  inline 2-foldable acro-only allocator: $00004013 $00004033 ra-rechenlogik-xor          ; \ xori x0, x0, 0  xor x0, x0, x0
+  : or       ( x1 x2 -- x )       or  inline 2-foldable acro-only allocator: $00006013 $00006033 ra-rechenlogik-or           ; \ ori  x0, x0, 0  or  x0, x0, x0
+  : and      ( x1 x2 -- x )      and  inline 2-foldable acro-only allocator: $00007013 $00007033 ra-rechenlogik-and          ; \ andi x0, x0, 0  and x0, x0, x0
+
+  : lshift   ( x1 x2 -- x )   lshift  inline 2-foldable acro-only allocator: $00001013 $00001033 ra-rechenlogik-schieben     ; \ slli x0, x0, 0  sll x0, x0, x0
+  : rshift   ( x1 x2 -- x )   rshift  inline 2-foldable acro-only allocator: $00005013 $00005033 ra-rechenlogik-schieben     ; \ srli x0, x0, 0  srl x0, x0, x0
+  : arshift  ( x1 x2 -- x )  arshift  inline 2-foldable acro-only allocator: $40005013 $40005033 ra-rechenlogik-schieben     ; \ srai x0, x0, 0  sra x0, x0, x0
+
+  : slt      ( x1 x2 -- x )     slt          2-foldable acro-only allocator: $00002013 $00002033 ra-rechenlogik-slt(u)       ; \ slti  x0, x0, 0 slt  x0, x0, x0
+  : sltu     ( x1 x2 -- x )     sltu         2-foldable acro-only allocator: $00003013 $00003033 ra-rechenlogik-slt(u)       ; \ sltiu x0, x0, 0 sltu x0, x0, x0
+
+  : c@signed ( addr  -- x )  c@signed inline            acro-only allocator: $00000003           ra-speicherlesen            ; \ lb x0, 0(x0)
+  : h@signed ( addr  -- x )  h@signed inline            acro-only allocator: $00001003           ra-speicherlesen            ; \ lh x0, 0(x0)
+  :  @       ( addr  -- x )   @       inline            acro-only allocator: $00002003           ra-speicherlesen            ; \ lw x0, 0(x0)
+  : c@       ( addr  -- x )  c@       inline            acro-only allocator: $00004003           ra-speicherlesen            ; \ lbu x0, 0(x0)
+  : h@       ( addr  -- x )  h@       inline            acro-only allocator: $00005003           ra-speicherlesen            ; \ lhu x0, 0(x0)
+
+  : c!       ( x addr --  )  c!       inline            acro-only allocator: $00000023           ra-speicherschreiben        ; \ sb x0, 0(x0)
+  : h!       ( x addr --  )  h!       inline            acro-only allocator: $00001023           ra-speicherschreiben        ; \ sh x0, 0(x0)
+  :  !       ( x addr --  )   !       inline            acro-only allocator: $00002023           ra-speicherschreiben        ; \ sw x0, 0(x0)
+
+  : *        ( x1 x2 -- x )   *        inline 2-foldable acro-only allocator: $02000033          ra-rechenlogik-muldiv       ; \ mul    x0, x0, x0
+  : mulh     ( x1 x2 -- x )  m* nip    inline 2-foldable acro-only allocator: $02001033          ra-rechenlogik-muldiv       ; \ mulh   x0, x0, x0
+  : mulhu    ( x1 x2 -- x ) um* nip    inline 2-foldable acro-only allocator: $02003033          ra-rechenlogik-muldiv       ; \ mulhu  x0, x0, x0
+  : /        ( x1 x2 -- x )  /         inline 2-foldable acro-only allocator: $02004033          ra-rechenlogik-muldiv       ; \ div    x0, x0, x0
+  : divu     ( x1 x2 -- x ) u/mod nip  inline 2-foldable acro-only allocator: $02005033          ra-rechenlogik-muldiv       ; \ divu   x0, x0, x0
+  : mod      ( x1 x2 -- x )   mod      inline 2-foldable acro-only allocator: $02006033          ra-rechenlogik-muldiv       ; \ rem    x0, x0, x0
+  : remu     ( x1 x2 -- x ) u/mod drop inline 2-foldable acro-only allocator: $02007033          ra-rechenlogik-muldiv       ; \ remu   x0, x0, x0
+
+[then]
+
+\ -----------------------------------------------------------------------------
+\   Definitionen definieren
+\ -----------------------------------------------------------------------------
+
+\ Den Inline-Cache in den Definitionen-Compiler einhängen
+
+: ; ( -- )
+
+  postpone ; immediate inline \ immediate + inline = compile-only
+
+allocator:
+
+  sp@ (sp) @ <> if ." Stack not balanced." cr quit then
+
+  ra-state ->tor @ link-register = \ TOR still in link register ? Enjoy direkt return !
+  if
+    eliminiere-tor \ Den Linkregister aus dem Allokator abmelden
+    tidyup-ra       \ Alles andere aufräumen
+    [ifdef] mips
+      $03E00008 opcode,     \ jr $zero, $31, $zero
+      $00000000 opcode,      \ nop for branch delay slot
+    [else]
+      $00008067 opcode,        \ jalr   zero, 0 (x1)
+    [then]
+  else
+    \ Canonical fallback with classic pop lr ret sequence.
+    tidyup-ra
+    postpone exit
+  then
+
+  write-inline-cache
+
+  smudge
+  false state !
+
+  [ flag-finished setflags ]
+;
+
+\  Creatures of this one are incompatible with the classic compiler:
+\  Therefore, take care of giving the creatures the acro-only flag.
+
+: postpone ( -- )
+
+  token
+
+  2dup find over 0<>
+  if \ Found it in dictionary.
+    swap literal, literal,
+    ['] kompilator-set-acro-only-flag call,
+
+  else
+    2drop \ Forget result of unsuccessful find.
+
+    2dup number ?dup \ Maybe postpone a literal ?
+    if
+      \ Successfully converted into a number !
+      ( x1 1 | x2 x1 2 )
+
+      2 =
+      if
+        swap
+        literal,
+        flag-literator literal,
+        ['] kompilator-set-acro-only-flag call,
+      then
+
+      literal,
+      flag-literator literal,
+      ['] kompilator-set-acro-only-flag call,
+
+    else
+      type ."  not found." cr quit
+    then
+  then
+
+  2drop \ Forget string.
+
+immediate inline acro-only ;
+
+\ More common variant, without support for postponing literals:
+\ : postpone ( -- )
+\
+\   token
+\
+\   2dup find over 0= if 2drop type ."  not found." cr quit then 2nip
+\
+\   swap literal, literal,
+\   ['] kompilator-set-acro-only-flag call,
+\
+\ immediate inline acro-only ;
+
+: : ( -- )
+
+  \ Neue Definition: Auf jeden Fall den Inline-Cache frisch leeren !
+  0 inline-cache-count !
+
+  init-register-allocator
+  link-register ra-state ->tor ! \ Link register im Allokator anmelden, damit ich nicht unbedingt eine push lr Sequenz schreiben muss.
+
+  \ Die üblichen Aufgaben von : abarbeiten, dabei aber eben keine push lr Sequenz schreiben.
+
+  sp@ (sp) !
+
+  (create)
+
+  true state !
+
+  constantfoldingpointer on
+
+acro-only ;
+
+\ -----------------------------------------------------------------------------
+\   Los geht's !
+\ -----------------------------------------------------------------------------
+
+.s
+acro-on
+.s
+
+\ -----------------------------------------------------------------------------
+
+\ Wenn Opcodes direkt geschrieben werden sollen, muss unbedingt der Innenzustand des Registerallokators aufgeräumt werden.
+
+           :       , ( x -- ) tidyup-ra       , acro-only ;
+           : opcode, ( x -- ) tidyup-ra opcode, acro-only ;
+[ifdef] h, :      h, ( x -- ) tidyup-ra      h, acro-only ; [then]
+
+\ -----------------------------------------------------------------------------
+\   Jetzt werden viele kleine Kerndefinitionen noch einmal aus den Allokator-
+\   Opcode-Einzelteilen zusammengefügt, damit sie über den Inline-Cache vererbt
+\   weiter optimiert werden können.
+\ -----------------------------------------------------------------------------
+
+maximum-inlining \ Volldampf voraus für die kommenden grundlegenden Definitionen.
+
+\ -----------------------------------------------------------------------------
+
+: u>=    ( x1 x2 -- ? )       sltu -1 +        inline 2-foldable acro-only ;
+: u<     ( x1 x2 -- ? )       sltu 0 swap -    inline 2-foldable acro-only ;
+: u>     ( x1 x2 -- ? ) swap  sltu 0 swap -    inline 2-foldable acro-only ;
+: u<=    ( x1 x2 -- ? ) swap  sltu -1 +        inline 2-foldable acro-only ;
+
+:  >=    ( x1 x2 -- ? )       slt  -1 +        inline 2-foldable acro-only ;
+:  <     ( x1 x2 -- ? )       slt  0 swap -    inline 2-foldable acro-only ;
+:  >     ( x1 x2 -- ? ) swap  slt  0 swap -    inline 2-foldable acro-only ;
+:  <=    ( x1 x2 -- ? ) swap  slt  -1 +        inline 2-foldable acro-only ;
+
+: <>     ( x1 x2 -- ? ) xor 1 sltu -1 +        inline 2-foldable acro-only ;
+: =      ( x1 x2 -- ? ) xor 1 sltu 0 swap -    inline 2-foldable acro-only ;
+
+: 0=     ( x -- ? )         1 sltu 0 swap -    inline 1-foldable acro-only ;
+: 0<>    ( x -- ? )         1 sltu -1 +        inline 1-foldable acro-only ;
+: 0<     ( x -- ? )         31 arshift         inline 1-foldable acro-only ;
+
+: over  ( x1 x2 -- x1 x2 x1 )    >r dup r> swap  inline 2-foldable acro-only ;
+: tuck  ( x1 x2 -- x2 x1 x2 )    swap over       inline 2-foldable acro-only ;
+: nip   ( x1 x2 -- x2 )          swap drop       inline 2-foldable acro-only ;
+: rot   ( x1 x2 x3 -- x2 x3 x1 ) >r swap r> swap        3-foldable acro-only ;
+: -rot  ( x1 x2 x3 -- x3 x1 x2 ) swap >r swap r>        3-foldable acro-only ;
+
+: s>d    ( n -- d )   dup 0<      inline 1-foldable acro-only ;
+: even   ( x1 -- x2 ) dup 1 and + inline 1-foldable acro-only ;
+: 1+     ( x -- x+1 )  1 +        inline 1-foldable acro-only ;
+: 1-     ( x -- x-1 )  1 -        inline 1-foldable acro-only ;
+: 2+     ( x -- x+2 )  2 +        inline 1-foldable acro-only ;
+: 2-     ( x -- x-2 )  2 -        inline 1-foldable acro-only ;
+: cell+  ( x -- x+4 )  4 +        inline 1-foldable acro-only ;
+: negate ( x -- -x )   0 swap -   inline 1-foldable acro-only ;
+: not    ( x -- ~x )  -1 xor      inline 1-foldable acro-only ;
+: invert ( x -- ~x )  -1 xor      inline 1-foldable acro-only ;
+
+: shr    ( x1 -- x2 )  1  rshift  inline 1-foldable acro-only ;
+: shl    ( x1 -- x2 )  1  lshift  inline 1-foldable acro-only ;
+: 2*     ( x1 -- x2 )  1  lshift  inline 1-foldable acro-only ;
+: 2/     ( x1 -- x2 )  1 arshift  inline 1-foldable acro-only ;
+: cells  ( x1 -- x2 )  2  lshift  inline 1-foldable acro-only ;
+
+: ror    ( x1 -- x2 ) dup 31 lshift swap 1 rshift or  inline 1-foldable acro-only ;
+: rol    ( x1 -- x2 ) dup 31 rshift swap 1 lshift or  inline 1-foldable acro-only ;
+
+: abs   ( n -- u ) dup 31 arshift dup >r + r> xor  inline 1-foldable acro-only ;
+: bic   ( x1 x2 -- x3 ) not and                    inline 2-foldable acro-only ;
+
+[ifndef] mips
+
+\ In dieser Reihenfolge mit einem Swap am Ende ist es kürzer, weil das High-Ergebnis direkt in x6 geladen werden kann.
+
+: um*   ( u1 u2 -- ud )    over over * >r mulhu r> swap    inline 2-foldable acro-only ;
+:  m*   ( n1 n2 -- d )     over over * >r mulh  r> swap    inline 2-foldable acro-only ;
+
+: u/mod ( u1 u2 -- u3 u4 ) over over remu >r divu r> swap  inline 2-foldable acro-only ;
+:  /mod ( n1 n2 -- n3 n4 ) over over mod  >r /    r> swap  inline 2-foldable acro-only ;
+
+[then]
+
+\ -----------------------------------------------------------------------------
+
+: +!    ( mask addr -- ) dup >r  @ +   r>  ! acro-only ;
+: h+!   ( mask addr -- ) dup >r h@ +   r> h! acro-only ;
+: c+!   ( mask addr -- ) dup >r c@ +   r> c! acro-only ;
+
+: bis!  ( mask addr -- ) dup >r  @      or  r>  ! acro-only ;
+: bic!  ( mask addr -- ) dup >r  @ swap bic r>  ! acro-only ;
+: xor!  ( mask addr -- ) dup >r  @      xor r>  ! acro-only ;
+
+: hbis! ( mask addr -- ) dup >r h@      or  r> h! acro-only ;
+: hbic! ( mask addr -- ) dup >r h@ swap bic r> h! acro-only ;
+: hxor! ( mask addr -- ) dup >r h@      xor r> h! acro-only ;
+
+: cbis! ( mask addr -- ) dup >r c@      or  r> c! acro-only ;
+: cbic! ( mask addr -- ) dup >r c@ swap bic r> c! acro-only ;
+: cxor! ( mask addr -- ) dup >r c@      xor r> c! acro-only ;
+
+: bit@  ( mask addr -- ? )  @ and 0<> acro-only ;
+: hbit@ ( mask addr -- ? ) h@ and 0<> acro-only ;
+: cbit@ ( mask addr -- ? ) c@ and 0<> acro-only ;
+
+\ -----------------------------------------------------------------------------
+
+: 2dup  ( x1 x2 -- x1 x2 x1 x2 )             over over               2-foldable acro-only ;
+: 2drop ( x1 x2 -- )                         drop drop               2-foldable inline acro-only ;
+: 2swap ( x1 x2 x3 x4 -- x3 x4 x1 x2 )       rot >r rot r>           4-foldable acro-only ;
+: 2over ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) >r >r 2dup r> r> 2swap  4-foldable acro-only ;
+: 2nip  ( x1 x2 x3 x4 -- x3 x4 )             >r >r 2drop r> r>       4-foldable acro-only ;
+
+: 2>r    ( x1 x2 -- ) ( R: -- x1 x2 )       SWAP >R >R             inline acro-only ;
+: 2r@    ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) R> R> 2DUP >R >R SWAP  inline acro-only ;
+: 2r>    ( -- x1 x2 ) ( R: x1 x2 -- )       R> R> SWAP             inline acro-only ;
+: 2rdrop ( -- )       ( R: x1 x2 -- )       rdrop rdrop            inline acro-only ;
+
+: 2@  ( a-addr -- ud|d ) DUP CELL+ @ SWAP @   inline acro-only ;
+: 2!  ( ud|d a-addr -- ) SWAP OVER ! CELL+ !  inline acro-only ;
+
+: d0<   ( d -- ? ) nip 0< inline 2-foldable acro-only ;
+: d0=   ( d -- ? ) or  0= inline 2-foldable acro-only ;
+
+: d=    ( d1 d2 -- ? ) ( x1 x2 x3 x4 -- ? ) rot xor ( x1 x3 x ) >r xor r> or 0=  4-foldable acro-only ;
+: d<>   ( d1 d2 -- ? ) ( x1 x2 x3 x4 -- ? ) rot xor ( x1 x3 x ) >r xor r> or 0<> 4-foldable acro-only ;
+
+: dshl  ( x1 x2 -- x1' x2' ) swap dup 31 rshift >r 1  lshift swap 1 lshift r> or       2-foldable acro-only ;
+: d2*   ( x1 x2 -- x1' x2' ) swap dup 31 rshift >r 1  lshift swap 1 lshift r> or       2-foldable acro-only ;
+: d2/   ( x1 x2 -- x1' x2' )      dup 31 lshift >r 1 arshift swap 1 rshift r> or swap  2-foldable acro-only ;
+: dshr  ( x1 x2 -- x1' x2' )      dup 31 lshift >r 1  rshift swap 1 rshift r> or swap  2-foldable acro-only ;
+
+\ -----------------------------------------------------------------------------
+\  Ganz schön komplizierte Kopfverrenkung !
+
+: dnegate ( d -- -d )
+
+  not swap not ( ~high ~low )
+
+  dup >r  ( ~high ~low   R: ~low )
+  1 +     ( ~high ~low+1 R: ~low )
+  dup r>  ( ~high ~low+1 ~low+1 ~low )
+  sltu    ( ~high ~low+1 c )
+  >r swap r>
+  +
+
+2-foldable acro-only ;
+
+
+: d+ ( x0 x1 y0 y1 -- z0 z1 )
+
+swap >r   ( x0 x1 y1 R: y0 )
++         ( x0 x1+y1 R: y0 )
+swap r@   ( x1+y1 x0 y0 R: y0 )
++         ( x1+y1 x0+y0 R: y0 )
+swap over ( x0+y0 x1+y1 x0+y0 R: y0 )
+r>        ( x0+y0 x1+y1 x0+y0 y0 )
+sltu      ( x0+y0 x1+y1 c )
++         ( x0+y0 x1+y1+c )
+
+4-foldable acro-only ;
+
+
+: d- ( x0 x1 y0 y1 -- z0 z1 )
+
+swap >r   ( x0 x1 y1 R: y0 )
+-         ( x0 x1-y1 R: y0 )
+swap      ( x1-y1 x0 R: y0 )
+dup r@    ( x1-y1 x0 x0 y0 R: y0 )
+sltu      ( x1-y1 x0 c R: y0 )
+swap      ( x1-y1 c x0 R: y0 )
+r> -      ( x1-y1 c x0-y0 )
+>r -      ( x1-y1-c R: x0-y0 )
+r> swap   ( x0-y0 x1-y1-c )
+
+4-foldable acro-only ;
+
+\ -----------------------------------------------------------------------------
+\  Common string tools which are easily optimised:
+
+: count ( addr -- addr+1 len ) dup 1 + swap c@ inline acro-only ;
+
+\ -----------------------------------------------------------------------------
+
+normal-inlining
+
+[ifdef] init
+  : init ( -- ) init welcome-to-acrobatics acro-on ;
+[else]
+  : init ( -- )      welcome-to-acrobatics acro-on ;
+[then]
+
+\ -----------------------------------------------------------------------------
+
+\ RISC-V 32 IM Disassembler, Copyright (C) 2018  Matthias Koch
+\ This is free software under GNU General Public License v3.
+\ Usage: Specify your target address in disasm-$ and give disasm-step some calls.
+
+\ ------------------------
+\  A quick list of words
+\ ------------------------
+
+: list ( -- )
+  cr
+  dictionarystart
+  begin
+    dup 8 + ctype space
+    dictionarynext
+  until
+  drop
+;
+
+\ ---------------------------------------
+\  Memory pointer and instruction fetch
+\ ---------------------------------------
+
+0 variable disasm-$   \ Current position for disassembling
+
+\ --------------------------------------------------
+\  Try to find address as code start in Dictionary
+\ --------------------------------------------------
+
+: disasm-string ( -- ) \ Takes care of an inline string
+  disasm-$ @ 4 + dup ctype skipstring 4 - disasm-$ !
+;
+
+: name. ( Address -- ) \ If the address is Code-Start of a dictionary word, it gets named.
+  >r
+  dictionarystart
+  begin
+    dup   8 + dup skipstring  r@ = if ."   --> " ctype else drop then
+    dictionarynext
+  until
+  drop
+  r>
+
+  case \ Check for inline strings ! They are introduced by calls to ." or s" internals.
+    ['] (.") of ."   -->  ." [char] " emit space disasm-string [char] " emit endof \ It is ." runtime ?
+    ['] (s") of ."   -->  s" [char] " emit space disasm-string [char] " emit endof \ It is .s runtime ?
+    ['] (c") of ."   -->  c" [char] " emit space disasm-string [char] " emit endof \ It is .c runtime ?
+  endcase
+;
+
+\ -------------------
+\  Beautiful output
+\ -------------------
+
+: u.2  0 <# # # #> type ;
+: u.4  0 <# # # # # #> type ;
+: u.8  0 <# # # # # # # # # #> type ;
+: u.ns 0 <# #s #> type ;
+: const. ."  #" u.ns ;
+: addr. u.8 ;
+
+: .decimal base @ >r decimal . r> base ! ;
+
+: register. ( u -- )
+  $1F and
+  case
+    0 of ." zero" endof
+    dup ." x" decimal u.ns hex
+  endcase ;
+
+\ ----------------------------------------
+\  Disassembler logic and opcode cutters
+\ ----------------------------------------
+
+: inst ( -- x ) disasm-$ @ @ ;
+
+: funct3 ( -- x ) inst 12 rshift $07 and ;
+: funct7 ( -- x ) inst 25 rshift ;
+
+: .rs1 ( -- ) inst 15 rshift register. ;
+: .rs2 ( -- ) inst 20 rshift register. ;
+: .rd  ( -- ) inst  7 rshift register. ;
+
+: imm_i  ( -- x ) inst 20 arshift ;
+
+: imm_s  ( -- x ) inst $FE000000 and 20 arshift
+                  inst 7 rshift $1F and or ;
+
+: imm_sb ( -- x ) inst   31 12 - rshift   1 12 lshift and
+                  inst   25  5 - rshift          $7E0 and   or
+                  inst    8  1 - rshift           $1E and   or
+                  inst   11  7 - lshift   1 11 lshift and   or
+                  19 lshift 19 arshift ;
+
+: imm_u  ( -- x ) inst $FFFFF000 and ;
+
+: imm_uj ( -- x ) inst   31 20 - rshift   1 20 lshift and
+                  inst   21  1 - rshift          $7FE and   or
+                  inst   20 11 - rshift   1 11 lshift and   or
+                  inst                         $FF000 and   or
+                  11 lshift 11 arshift ;
+
+\ ---------------
+\  Disassembler
+\ ---------------
+
+0 variable disasm-destination
+
+: disasm-load ( -- )
+
+  funct3
+  case
+    0 of ." lb     " endof
+    1 of ." lh     " endof
+    2 of ." lw     " endof
+    4 of ." lbu    " endof
+    5 of ." lhu    " endof
+  endcase
+
+  .rd ." , " imm_i . ." (" .rs1 ." )"
+;
+
+: disasm-immediate ( -- )
+
+  imm_i
+
+  funct3
+  case
+    0 of ." addi   " endof
+    1 of ." slli   " endof
+    2 of ." slti   " endof
+    3 of ." sltiu  " endof
+    4 of ." xori   " dup disasm-destination xor! endof
+    5 of inst 26 rshift 16 = if ." srai   " else ." srli   " then $1F and endof
+    6 of ." ori    " endof
+    7 of ." andi   " endof
+  endcase
+
+  .rd ." , " .rs1 ." , " .
+;
+
+: disasm-auipc ( -- )
+  ." auipc  " .rd ." , " imm_u u.8
+;
+
+: disasm-store ( -- )
+
+  funct3
+  case
+    0 of ." sb     " endof
+    1 of ." sh     " endof
+    2 of ." sw     " endof
+  endcase
+
+  .rs2 ." , " imm_s . ." (" .rs1 ." )"
+;
+
+: disasm-register ( -- )
+
+  funct7 1 = \ Multiplication & Division RV32M
+  if
+    funct3
+    case
+      0 of ." mul    " endof
+      1 of ." mulh   " endof
+      2 of ." mulhsu " endof
+      3 of ." mulhu  " endof
+      4 of ." div    " endof
+      5 of ." divu   " endof
+      6 of ." rem    " endof
+      7 of ." remu   " endof
+    endcase
+  else
+    funct3
+    case
+      0 of funct7 32 = if ." sub    " else ." add    " then endof
+      1 of ." sll    " endof
+      2 of ." slt    " endof
+      3 of ." sltu   " endof
+      4 of ." xor    " endof
+      5 of funct7 32 = if ." sra    " else ." srl    " then endof
+      6 of ." or     " endof
+      7 of ." and    " endof
+    endcase
+  then
+
+  .rd ." , " .rs1 ." , " .rs2
+;
+
+: disasm-lui ( -- )
+  ." lui    " .rd ." , " imm_u u.8
+  imm_u disasm-destination !
+;
+
+: disasm-branch ( -- )
+
+  funct3
+  case
+    0 of ." beq    " endof
+    1 of ." bne    " endof
+    4 of ." blt    " endof
+    5 of ." bge    " endof
+    6 of ." bltu   " endof
+    7 of ." bgeu   " endof
+  endcase
+
+  .rs1 ." , " .rs2 ." , " disasm-$ @ imm_sb + u.8
+;
+
+: disasm-jalr ( -- )
+  ." jalr   " .rd ." , " imm_i . ." (" .rs1 ." )"
+
+  inst 15 rshift $1F and 15 = if disasm-destination @ imm_i + name. then
+;
+
+: disasm-jal
+  ." jal    " .rd ." , " disasm-$ @ imm_uj + dup u.8 name.
+;
+
+: disasm-system ( -- )
+
+  funct3
+  ?dup
+  if \ CSR...
+  case
+
+    1 of ." csrrw  " endof
+    2 of ." csrrs  " endof
+    3 of ." csrrc  " endof
+
+    5 of ." csrrwi " endof
+    6 of ." csrrsi " endof
+    7 of ." csrrci " endof
+  endcase
+
+  .rd ." , "
+  inst 20 rshift u.4  ." , "
+  funct3 5 u< if .rs1 else inst 15 rshift $1F and u.2 then
+
+  else \ PRIV
+    inst 20 rshift
+
+    case
+      $000 of ." ecall"  endof
+      $001 of ." ebreak" endof
+      $105 of ." wfi"    endof
+      $302 of ." mret"   endof
+
+      ." Unknown system opcode"
+    endcase
+  then
+;
+
+: disasm ( -- ) \ Disassembles one machine instruction and advances disasm-$
+
+    inst $7F and
+    case
+      $03 of disasm-load      endof
+      $13 of disasm-immediate endof
+      $17 of disasm-auipc     endof
+      $23 of disasm-store     endof
+      $33 of disasm-register  endof
+      $37 of disasm-lui       endof
+      $63 of disasm-branch    endof
+      $67 of disasm-jalr      endof
+      $6F of disasm-jal       endof
+      $73 of disasm-system    endof
+
+      ." Unknown opcode"
+    endcase
+    4 disasm-$ +!
+;
+
+\ ------------------------------
+\  Single instruction printing
+\ ------------------------------
+
+: memstamp \ ( Addr -- ) Shows a memory location nicely
+    dup u.8 ." : " @ u.8 ."   " ;
+
+: disasm-step ( -- )
+    disasm-$ @                 \ Note current position
+    dup memstamp disasm cr     \ Disassemble one instruction
+
+    begin \ Write out all disassembled memory locations
+      4 + dup disasm-$ @ <>
+    while
+      dup memstamp cr
+    repeat
+    drop
+;
+
+\ ------------------------------
+\  Disassembler for definitions
+\ ------------------------------
+
+: seec ( -- ) \ Continues to see
+  base @ hex cr
+
+  begin
+    disasm-$ @ addrinflash?
+    disasm-$ @ addrinram?    or not
+    disasm-$ @ @ $00008067 = or \ Flag: Loop terminates with ret or when leaving memory area.
+    disasm-$ @ @ $30200073 = or \       Also check for mret
+    disasm-step
+  until
+
+  base !
+;
+
+: see ( -- ) \ Takes name of definition and shows its contents from beginning to first ret
+  ' disasm-$ !
+  seec
+;
+
+\ =========================================================================
+\  File: fixpt-math-lib.fs for Mecrisp-Stellaris by Matthias Koch
+\
+\  This file contains these functions for s31.32 fixed point numbers:
+\
+\           sqrt, sin, cos, tan, asin, acos, atan
+\           log2, log10, ln, pow2, pow10, exp
+\
+\ ------------- Comments on sqrt and trig functions -----------------------
+\
+\  All angles are in degrees.
+\
+\  Accuracy is good rounded to 7 significant digits, with some exceptions.
+\  In particular, the asin and acos functions have reduced accuracy
+\  near the endpoints of the range of their inputs (+/-1) due to their
+\  very large slopes there.  See the tests in fixpt-mat-lib-tests.fs.
+\
+\  The sin function is based on Maclaurin series for sin and cos over
+\  the interval [0, pi/4], evaluated as polynomials with the Horner
+\  method.  This is extended to all angles using (anti)symmetry.  Cos is
+\  calculated from sin with cos(x) = sin(x+90), and tan is calculated as
+\  sin/cos.
+\
+\  Atan is based on the first 7 terms of its Euler series over the
+\  interval [0, 1/8].  It is extended to [0, 1] using the identity
+\
+\   atan(x) = atan(c) + atan((x-c)/(1+x*c)), c = 1/8, 2/8, ..., 7/8, 1.
+\
+\  For x>1 we use atan(x) = 90 - atan(1/x).  Negative arguments are handled
+\  by antisymmetry.  Asin and acos are calculated using the formulas
+\
+\    asin(x) = atan(x / sqrt(1 - x^2)),  x^2 <= 1/2
+\
+\    asin(x) = 90 - atan(sqrt(1 - x^2) / x),  x^2 > 1/2
+\
+\    acos(x) = 90 - asin(x)
+\
+\  The square root is calculated bitwise with a standard algorithm over
+\  the interval [0, 1] and is extended to all positive x by division by 4
+\  until the quotient is in [0, 1].
+\
+\ ------------- Comments on the log and power functions -------------------
+\
+\  The user can check for accuracy by running the test functions in the
+\  file fixpt-math-lib-tests.fs, or by running tests tailored to their use.
+\  Generally the functions are accurate when rounded to about 7 significant
+\  digits.  However, the user should not expect good accuracy when dealing
+\  with very small fractional values due to the limitations of fixed
+\  point.  In particular, this affects the values of the power and
+\  exponential functions for larger negative inputs, when the relative
+\  accuracy decreases significantly.
+\
+\  If the argument to a log function is non-positive, the function returns
+\  "minus infinity," the largest negative s31.32 value.  This is the only
+\  signal that an invalid input has been used.  Large negative inputs
+\  to the power and exponential functions will return zero.  Large positive
+\  inputs will return "plus infinity," the largest positive s31.32 value.
+\  The code shows the specific values used to determine "large" in each
+\  case.
+\
+\  The algorithm for calculating the base 2 log is taken from pseudocode
+\  in the Wikipedia article "Binary logarithm" which is based on:
+\
+\     Majithia, J. C.; Levan, D. (1973), "A note on base-2 logarithm
+\     computations", Proceedings of the IEEE, 61 (10): 1519–1520,
+\     doi:10.1109/PROC.1973.9318
+\
+\  The log10(x) and natural logarithm ln(x) make use of the identities
+\
+\     log10(x) = log10(2)*log2(x), ln(x) = ln(2)*log2(x)
+\
+\  where log10(2) and ln(2) are given constants.
+\
+\  The pow2(x) = 2^x function is calculated as 2^x = (2^z)*(2^n) where
+\  x = z + n, n is an integer with n <= x < n+1, and 0 <= z < 1.  The
+\  factor 2^z is calculated by the identity 2^z = exp(ln(2)*z) where
+\  exp(y) is calculated using its Maclaurin series.  The other factor
+\  is accounted for by shifting 2^z n times (shift left for n > 0, shift
+\  right for n < 0).
+\
+\  The pow10(x) = 10^x function is calculated using the identity
+\
+\               10^x = 2^(x*ln(10)/ln(2))
+\
+\  except for positive integer values of x, where simple multiplication
+\  is used.
+\
+\  The exp(y) function is calculated using the series above if y is
+\  between -0.36 and +0.36.  Otherwise it is calculated from pow2 using the
+\  identity exp(y) = pow2(y/ln(2)).
+\
+\ -------------------------------------------------------------------------
+\  Note:  Some s31.32 constant values were rounded from theoretical values
+\         and entered below as (comma-part) integers rather calculating
+\         them using Forth conversions, which trucate.
+\
+\ -------------------------------------------------------------------------
+\  Andrew Palm
+\  2018.04.09
+\ =========================================================================
+
+
+\ -------------------------------------------------------------------------
+\  Misc. helper words, constants, and variables
+\ -------------------------------------------------------------------------
+\ Most positive and negative s31.32 values possible
+$FFFFFFFF $7FFFFFFF 2constant +inf  \ 2147483647,9999999999
+$0 $80000000 2constant -inf         \ 2147483648,0
+
+\ Return the floor of an s31.32 value df
+: floor ( df -- df ) nip 0 swap 2-foldable ;
+
+\ Convert an s31.32 angle df1 in degrees to an angle df2 in [0, 360)
+\ such that df1 = df2 + n*360 where n is an integer
+: deg0to360 ( df1 -- df2 )  360,0 d/mod 2drop 2dup d0< if 360,0 d+ then
+  2-foldable
+;
+
+\ Convert an s31.32 angle df1 in degrees to an angle df2 in [-90, 90)
+\ such that df1 = df2 + n*180 where n is an integer.  (For tan only.)
+: deg-90to90 ( df1 -- df2 )
+  180,0 d/mod 2drop
+  2dup 90,0 d< not if
+    180,0 d-
+  else
+    2dup -90,0 d< if
+      180,0 d+
+    then
+  then
+  2-foldable
+;
+
+\ From common directory of Mecrisp-Stellaris Forth 2.4.0
+: numbertable <builds does> swap 2 lshift + @ ;
+
+\ -------------------------------------------------------------------------
+\  Square root functions
+\ -------------------------------------------------------------------------
+: 0to1sqrt ( x -- sqrtx )
+  \ Take square root of s31.32 number x with x in interval [0, 1]
+  \ Special cases x = 0 and x = 1
+  2dup d0= if exit then
+  2dup 1,0 d= if exit then
+
+  swap    \ Put x in MSW of unsigned 64-bit integer u
+
+  \ Find square root of u as 64-bit unsigned int
+  0,0 2swap 1,0 30 lshift  \ Stack: ( res  u  bit )
+  \ Start value of bit is highest power of 4 <= u
+  begin 2over 2over du< while dshr dshr repeat
+
+  \ Do while bit not zero
+  begin 2dup 0,0 d<> while
+    2rot 2over 2over d+ 7 pick 7 pick du> not if  \ u >= res+bit ?
+      2rot 2over d- 2rot 2tuck d-    \ u = u - res - bit
+      2swap 2rot dshr 2over d+            \ res = (res >> 1) + bit
+    else
+      dshr    \ res = res >> 1
+    then
+    2-rot       \ Return stack to ( res u bit )
+    dshr dshr   \ bit = bit >> 2
+  repeat
+
+  \ Drop u and bit, res is s31.32 square root of x
+  2drop 2drop
+  2-foldable
+;
+
+: sqrt ( x -- sqrtx )
+  \ Find square root of non-negative s31.32 number x
+  \ If x in interval [0, 1], use 0to1sqrt
+  2dup 1,0 d> not if
+    0to1sqrt
+  else
+    \ Divide x by 4 until result is in interval [0, 1]
+    0,0 2swap   \ Init count of divides ndiv (use double for convenience)
+    begin 2dup 1,0 d> while
+      2swap 1,0 d+ 2swap    \ Incr count
+      dshr dshr             \ Divide by 4
+    repeat
+    0to1sqrt
+    2swap nip 0 do    \ ndiv consumed
+      dshl                  \ Multiply by 2 ndiv times
+    loop
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Helpers and constants for trig functions
+\ -------------------------------------------------------------------------
+: deg2rad ( deg -- rad )
+  \ Convert s31.32 in degress to s31.32 in radians
+  74961321 0 f*
+  2-foldable
+;
+
+: rad2deg ( rad -- deg )
+  \ Convert s31.32 in radians to s31.32 in degrees
+  1270363336 57 f*
+  2-foldable
+;
+
+\ pi/2 and pi/4 as s31.32 numbers (whole part first for retrieval with 2@)
+2451551556 1 2constant pi/2
+3373259426 0 2constant pi/4
+
+\ s31.32 comma parts of coefficients in Horner expression of 7-term series
+\ expansion of sine after an x is factored out.  The whole parts are 0 and
+\ are supplied in code.
+numbertable sin-coef
+   20452225 ,   \  1/(14*15)
+   27531842 ,   \  1/(12*13)
+   39045157 ,   \  1/(10*11)
+   59652324 ,   \  1/(8*9)
+  102261126 ,   \  1/(6*7)
+  214748365 ,   \  1/(4*5)
+  715827883 ,   \  1/(2*3)
+
+: half-q1-sin-rad  ( x -- sinx )
+  \ Sin(x) for x in first half of first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/4 and pi/4
+  2dup 2dup f*          \  x and x^2 on stack as dfs
+  \ Calculate Horner terms
+  -1,0   \ Starting Horner term is -1
+  7 0 do
+    \ Multiply last term by x^2 and coefficient, then add +1 or -1 to get
+    \ new term
+    2over f* i sin-coef 0 f* 0 1
+    i 2 mod 0= if d+ else d- then
+  loop
+  \ Last term is multiplied by x
+  2nip f*
+  2-foldable
+;
+
+\ s31.32 comma parts of coefficients in Horner expression of 8-term series
+\ expansion of cosine.  The whole parts are 0 and are supplied in code.
+numbertable cos-coef
+   17895697 ,   \  1/(15*16)
+   23598721 ,   \  1/(13*14)
+   32537631 ,   \  1/(11*12)
+   47721859 ,   \  1/(9*10)
+   76695845 ,   \  1/(7*8)
+  143165577 ,   \  1/(5*6)
+  357913941 ,   \  1/(3*4)
+ 2147483648 ,   \  1/2
+
+: half-q1-cos-rad  ( x -- cosx )
+  \ Cos(x) for x in first half of first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/4 and pi/4
+  2dup f*          \  x^2 on stack
+  \ Calculate Horner terms
+  1,0   \ Starting Horner term is 1
+  8 0 do
+    \ Multiply last term by x^2 and coefficient, then add +1 or -1 to get
+    \ new term
+    2over f* i cos-coef 0 f* 0 1
+    i 2 mod 0= if d- else d+ then
+  loop
+  2nip
+  2-foldable
+;
+
+: q1-sin-rad ( x -- sinx )
+  \ Sin(x) for x in first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/2 and pi/2
+  2dup pi/4 d< if
+    half-q1-sin-rad
+  else
+    pi/2 2swap d- half-q1-cos-rad
+  then
+  \ Apply max/min limits
+  \ 2dup 1,0 d> if 2drop 1,0 exit then
+  \ 2dup -1,0 d< if 2drop -1,0 exit then
+  2-foldable
+;
+
+: q1toq4-sin ( x -- sinx )
+  \ Sin(x) for x in quadrants Q1 through Q4
+  \ x is a s31.32 angle in degrees between 0 and 360
+  2dup 270,0 d> if
+    360,0 d- deg2rad q1-sin-rad
+  else 2dup 90,0 d> if
+    180,0 d- deg2rad q1-sin-rad dnegate
+  else
+    deg2rad q1-sin-rad
+  then then
+  2-foldable
+;
+
+\ s31.32 comma parts of coefficients in Horner expression of 6-term Euler
+\ expansion of atan after x/(x^2+1) is factored out.  The whole parts are
+\ 0 and are supplied in code.  The series variable is y = (x^2)/(x^2+1).
+numbertable atan-coef
+  3964585196 ,    \   12/13
+  3904515724 ,    \   10/11
+  3817748708 ,    \   8/9
+  3681400539 ,    \   6/7
+  3435973837 ,    \   4/5
+  2863311531 ,    \   2/3
+
+: base-ivl-atan ( x -- atanx )
+  \ Calc atan for s32.31 x in base interval 0 to 1/8.
+  2dup 2dup f* 2dup 1,0 d+     \ Stack: ( x  x^2  x^2+1 )
+  2rot 2swap f/                \ Stack: ( x^2  x/(x^2+1) )
+  2swap 2dup 1,0 d+ f/         \ Stack: ( x/(x^2+1)  (x^2)/(x^2+1) )
+  \ Calc Horner terms for powers of y = (x^2)/(x^2+1)
+  1,0   \ Starting Horner term is 1
+  6 0 do
+    \ Multiply last term by y and coefficient, then add 1 to get new term
+    2over f* i atan-coef 0 f* 1,0 d+
+  loop
+  \ Last term is multiplied by x/(x^2+1)
+  2nip f*
+  2-foldable
+;
+
+\ Table of atan(i/8), i = 0, 1, ..., 8, values in radians
+\ Only comma parts given, all whole parts are 0.
+numbertable atan-table
+           0 ,
+   534100635 ,
+  1052175346 ,
+  1540908296 ,
+  1991351318 ,
+  2399165791 ,
+  2763816217 ,
+  3087351340 ,
+  3373259426 ,
+
+: 0to1-atan ( x -- atanx )
+  \ Calc atan for s31.32 x in interval [0, 1]
+  2dup 1,0 d= if
+    2drop
+    8 atan-table 0
+  else
+    \ Find interval [i/8, (i+1)/8) containing x, then use formula
+    \ atan(x) = atan(i/8) + atan((x - (i/8))/(1 + (x*i/8))) where
+    \ the argument in the second term is in [0, 1/8].
+    0 7 do
+      0 i 8,0 f/ 2over 2over d< not if
+        2over 2over d-
+        2-rot f* 1,0 d+
+        f/ base-ivl-atan
+        i atan-table 0 d+
+        leave
+      else
+        2drop
+      then
+    -1 +loop
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Trig functions
+\ -------------------------------------------------------------------------
+: sin ( x -- sinx )
+  \ x is any s31.32 angle in degrees
+  2dup 2dup d0< if dabs then
+  \ Stack is ( x |x| )
+  360,0 ud/mod 2drop
+  q1toq4-sin    \ sin|x|
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  2-foldable
+;
+
+: cos ( x -- cosx )
+  \ x is any s31.32 angle in degrees
+  90,0 d+ sin
+  2-foldable
+;
+
+: tan ( x -- tanx )
+  \ x is any s31.32 angle in degrees
+  \ Move x to equivalent value in [-90, 90)
+  deg-90to90
+  \ If |x| > 89,9 deg, use approximation sgn(x)(180/pi)/(90-|x|)
+  2dup dabs 2dup 89,8 d> if
+    90,0 2swap d- 608135817 3 f* 180,0 2swap f/
+    2swap d0< if dnegate then
+  else
+    2drop 2dup sin 2swap cos f/
+  then
+  2-foldable
+;
+
+: atan ( x -- atanx )
+  \ Calc atan for s31.32 x, return result in degrees
+  2dup 2dup d0< if dabs then   \ Stack: ( x |x| )
+  \ Find atan(|x|)
+  2dup 1,0 d> if
+    \ |x| > 1, use atan(|x|) = (pi/2) - atan(1/|x|) with 1/|x| in [0, 1]
+    1,0 2swap f/ 0to1-atan pi/2 2swap d-
+  else
+    \ |x| <= 1
+    0to1-atan
+  then
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  rad2deg
+  2-foldable
+;
+
+: asin ( x -- asinx )
+  \ Calc asin for s31.32 x in interval [-1, 1], return result in degrees
+  2dup 2dup d0< if dabs then
+  \ Stack is ( x |x| )
+  2dup 1,0 d> if drop exit then     \ Exit if |x|>1 with x on stack
+  2dup 2dup f* 1,0 2swap d- 0to1sqrt    \ Stack: ( x  |x|  sqrt(1-x^2) )
+  2over 2dup f* 0,5 d> if           \ x^2 > (1/2) ?
+    2swap f/ atan 90,0 2swap d-
+  else
+    f/ atan
+  then
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  2-foldable
+;
+
+: acos ( x -- acosx )
+  \ Calc acos for s31.32 x in interval [-1, 1], return result in degrees
+  90,0 2swap asin d-
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Helper for logarithmic functions
+\ -------------------------------------------------------------------------
+: log2-1to2 ( y -- log2y )
+  \ Helper function that requires y is s31.32 value with 1 <= y < 2
+  0 0 2swap 0
+  ( retval y cum_m )
+  \ while((cum_m < 33) && (y > 1))
+  begin dup 2over
+    ( retval y cum_m cum_m y )
+    1,0 d> swap 33 < and while
+    ( retval y cum_m )
+    rot rot 0 -rot        \ m = 0, z = y
+    ( retval cum_m m z)
+    \ Do z = z*z, m = m+1 until 2 <= z.  We also get z < 4
+    begin
+      2dup f* rot 1 + -rot
+      ( retval cum_m m z )
+      2dup 2,0 d< not
+    until
+    \ At this point z = y^(2^m) so that log2(y) = (2^(-m))*log2(z)
+    \ = (2^(-m))*(1 + log2(z/2)) and 1 <= z/2 < 2
+    \ We will add m to cum_m and add 2*(-cum_m) to the returned value,
+    \ then iterate with a new y = z/2
+    ( retval cum_m m z )
+    2swap + -rot dshr 2>r   \ cum_m = cum_m + m, y = z/2
+    ( retval cum_m ) ( R: y=z/2 )
+    \ retval = retval + 2^-cum_m
+    1,0 2 pick 0 do dshr loop
+    ( retval cum_m 2^-cum_m )
+    rot >r d+
+    ( retval ) ( R: y cum_m )
+    r> 2r> rot
+    ( retval y cum_m )
+  repeat
+  drop 2drop
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Logarithmic functions
+\ -------------------------------------------------------------------------
+: log2 ( x -- log2x )
+  \ Calculates base 2 logarithm of positive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  \ Find the n such that 1 <= (2^(-n))*x < 2
+  \ This n is the integer part (characteristic) of log2(x)
+  0 -rot
+  ( n=0 y=x )
+  2dup 1,0 d> if
+    \ Do n = n+1, y = y/2 while (y >= 2)
+    begin 2dup 2,0 d< not while
+      ( n y )
+      dshr rot 1 + -rot
+    repeat
+  else
+    \ Do n = n-1, y = 2*y while (y < 1)
+    begin 2dup 1,0 d< while
+      ( n y )
+      dshl rot 1 - -rot
+    repeat
+  then
+
+  \ Now y = (2^(-n))*x so log2(x) = n + log2(y) and we use the
+  \ helper function to get log2(y) since 1 <= y < 2
+  log2-1to2 rot 0 swap d+
+  ( log2x )
+  2-foldable
+;
+
+1292913986 0 2constant log10of2
+
+: log10 ( x -- log10x )
+  \ Calculates base 10 logarithm of positive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  \ Find the n such that 1 <= (10^(-n))*x < 10
+  \ This n is the integer part (characteristic) of log2(x)
+  0 -rot
+  ( n=0 y=x )
+  2dup 1,0 d> if
+    \ Do n = n+1, y = y/10 while (y >= 10)
+    begin 2dup 10,0 d< not while
+      ( n y )
+      10,0 f/ rot 1 + -rot
+    repeat
+  else
+    \ Do n = n-1, y = 10*y while (y < 1)
+    begin 2dup 1,0 d<  while
+      ( n y )
+      10,0 f* rot 1 - -rot
+    repeat
+  then
+
+  \ Now y = (10^(-n))*x so log10(x) = n + log10(y) and we use the
+  \ identity log10(y) = log10(2)*log2(y)
+  log2 log10of2 f* rot 0 swap d+
+  ( log10x )
+  2-foldable
+;
+
+2977044472 0 2constant lnof2
+
+: ln ( x -- lnx )
+  \ Return the natural logarithm of a postive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  log2 lnof2 f*
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Power functions
+\ -------------------------------------------------------------------------
+\ s31.32 comma parts of all but first coefficient in Horner expansion of
+\ a partial sum of the series expansion of exp(x).  The whole parts are 0
+\ and are supplied in code.
+numbertable exp-coef
+   390451572 ,   \  1/11
+   429496730 ,   \  1/10
+   477218588 ,   \  1/9
+   536870912 ,   \  1/8
+   615366757 ,   \  1/7
+   715827883 ,   \  1/6
+   858993459 ,   \  1/5
+  1073741824 ,   \  1/4
+  1431655765 ,   \  1/3
+  2147483648 ,   \  1/2
+
+: exp-1to1 ( x -- expx )
+  \ Calculate exp(x) for x an s31.32 value.  Values are correct when
+  \ when rounded to six decimal places when x is between +/-0.7.  Uses an
+  \ 11-term partial sum evaluated using Horner's method.
+  \ Calculate Horner terms
+  1,0   \ Starting Horner term is 1
+  10 0 do
+    \ Multiply last term by x and coefficient, then add to get new term
+    2over f* i exp-coef 0 f* 0 1 d+
+  loop
+  \ Last part of expansion
+  2over f* 0 1 d+
+  2nip
+  2-foldable
+;
+
+: pow2 ( x -- 2^x )
+  \ Return 2 raised to the power x where x is s31.32
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ If x < -32, 0 is returned.  If x >= 31, returns s31.32 ceiling
+  2dup -32,0 d< if 2drop 0,0 exit then
+  2dup 31,0 d< not if 2drop +inf exit then
+  \ Get largest integer n such that n <= x so x = z + n, 0 <= z < 1
+  2dup floor 2swap 2over d-
+  ( n z )
+  \ Get exp(z*ln2) = 2^z, then shift n times to get 2^x = (2^n)*(2^z)
+  lnof2 f* exp-1to1 2swap nip
+  ( 2^z n )  \ n now a single
+  dup 0= if
+    drop
+  else
+    dup 0< if
+      negate 0 do dshr loop
+    else
+      0 do dshl loop
+    then
+  then
+  2-foldable
+;
+
+1901360723 1 2constant 1overlnof2
+
+: exp ( x -- expx )
+  \ Return the exponential e^x of the s31.32 value x
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ Return s31.32 ceiling for large pos. exponents, 0 for large neg.
+  2dup 21,5 d> if 2drop +inf exit then
+  2dup -22,2 d< if 2drop 0,0 exit then
+  \ If |x| < 0.36, use exponential series approximation
+  \ Otherwise, use exp(x) = pow2(x/ln(2))
+  2dup dabs 0,36 d< if
+    exp-1to1
+  else
+    1overlnof2 f* pow2
+  then
+  2-foldable
+;
+
+1382670639 3 2constant ln10overln2
+
+: pow10 ( x -- 10^x )
+  \ Return 10 raised to the power x where x is s31.32
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ Return s31.32 ceiling for large pos. exponents, 0 for large neg.
+  2dup 9,35 d> if 2drop +inf exit then
+  2dup -9,64 d< if 2drop 0,0 exit then
+  \ If x is a positive integer generate powers of 10 with multiplications
+  \ Otherwise use 10^x = 2^(x*ln(10)/ln(2))
+  2dup 2dup floor d= if
+    2dup 0,0 d> if
+      1,0 2swap nip
+      0 do 10,0 f* loop
+    else
+      ln10overln2 f* pow2
+    then
+  else
+    ln10overln2 f* pow2
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+
+: s>f ( n -- f ) 0 swap  1-foldable ; \ Signed integer --> Fixpoint s31.32
+: f>s ( f -- n ) nip     2-foldable ; \ Fixpoint s31.32 --> Signed integer
+
+\ -----------------------------------------------------------------------------
+\   A few tools for dictionary wizardy
+\ -----------------------------------------------------------------------------
+
+: executablelocation? ( addr -- ? )
+  dup  addrinram?              \ In RAM
+  over flashvar-here u< and     \ and below the variables and buffers
+  swap addrinflash? or           \ or in flash ?
+;
+
+: link>flags ( addr -- addr* ) 4 + ;
+: link>name  ( addr -- addr* ) 8 + ;
+: link>code  ( addr -- addr* ) 8 + skipstring ;
+
+0 variable searching-for
+0 variable closest-found
+
+: code>link  ( entrypoint -- addr | 0 ) \ Try to find this code start address in dictionary
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+    dup link>code searching-for @ = if dup closest-found ! then
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  closest-found @
+;
+
+: inside-code>link ( addr-inside -- addr | 0 ) \ Try to find this address inside of a definition
+
+  dup executablelocation? not if drop 0 exit then  \ Do not try to find locations which are not executable
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+
+    dup link>code searching-for @ u<=
+    if \ Is the address of this entry BEFORE the address which is to be found ?
+      \ Distance to current   Latest best distance
+      searching-for @ over -  searching-for @ closest-found @ -  <
+      if dup closest-found ! then \ Is the current entry closer to the address which is to be found ?
+    then
+
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  \ Do not cross RAM/Flash borders:
+
+  searching-for @ addrinflash?
+  closest-found @ addrinflash? xor if 0 else closest-found @ then
+;
+
+: traceinside. ( addr -- )
+  inside-code>link if
+  ." ( "                 closest-found @ link>code   hex.
+  ." + " searching-for @ closest-found @ link>code - hex.
+  ." ) "
+  closest-found @ link>name ctype
+  then
+;
+
+: variable>link  ( location -- addr | 0 ) \ Try to find this variable or buffer in dictionary
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+
+    dup link>flags @ \ Fetch Flags of current definition
+
+    $7FFFFFF0 and \ Snip off visibility bit and alloted size field
+    dup $140 = swap $80 = or \ "Buffer" or "Ramallot"
+    if
+      dup link>code execute searching-for @ = if dup closest-found ! then
+    then
+
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  closest-found @
+;
+
+: variable-name. ( addr -- ) \ Print the name of this variable or buffer, if possible
+  variable>link ?dup if link>name ctype then
+;
+\ -----------------------------------------------------------
+\   Cooperative Multitasking
+\ -----------------------------------------------------------
+
+\ Configuration:
+
+128 cells constant stackspace \ 128 stack elements for every task
+
+\ Internal stucture of task memory:
+\  0: Pointer to next task
+\  4: Task currently active ?
+\  8: Saved stack pointer
+\ 12: Handler for Catch/Throw
+\  Parameter stack space
+\  Return    stack space
+
+false 0 true flashvar-here 4 cells - 4 nvariable boot-task \ Boot task is active, without handler and has no extra stackspace.
+boot-task boot-task ! \ For compilation into RAM only
+
+boot-task variable up \ User Pointer
+: next-task  ( -- task )    up @ inline ;
+: task-state ( -- state )   up @ 1 cells + inline ;
+: save-task  ( -- save )    up @ 2 cells + inline ;
+: handler    ( -- handler ) up @ 3 cells + inline ;
+
+: (pause) ( stacks fly around )
+    (do)                \ push I and I'
+    rp@ sp@ save-task !  \ save return stack and stack pointer
+    begin
+      next-task @ up !     \ switch to next running task
+    task-state @ until
+    save-task @ sp! rp!  \ restore pointers
+    unloop ;              \ pop the loop registers
+
+: wake ( task -- ) 1 cells +  true swap ! ; \ Wake a random task (IRQ save)
+: idle ( task -- ) 1 cells + false swap ! ;  \ Idle a random task (IRQ save)
+
+\ -------------------------------------------------------
+\  Round-robin list task handling - do not use in IRQ !
+\ -------------------------------------------------------
+
+: stop ( -- ) false task-state ! pause ; \ Stop current task
+: multitask  ( -- ) ['] (pause) hook-pause ! ;
+: singletask ( -- ) [']  nop    hook-pause ! ;
+
+: task-in-list? ( task -- ? ) \ Checks if a task is currently inside of round-robin list (do not use in IRQ)
+  next-task
+  begin
+    ( Task-Address )
+    2dup = if 2drop true exit then
+    @ dup next-task = \ Stop when end of circular list is reached
+  until
+  2drop false
+;
+
+: previous ( task -- addr-of-task-before )
+  \ Find the task that has the desired one in its next field
+  >r next-task begin dup @ r@ <> while @ repeat rdrop
+;
+
+: insert ( task -- ) \ Insert a task into the round-robin list
+  dup task-in-list?  \ Is the desired task currently linked into ?
+  if drop else next-task @ over ! next-task ! then
+;
+
+: remove ( task -- ) \ Remove a task from the round-robin list
+  dup task-in-list?  \ Is the desired task currently linked into ?
+  if dup @ ( task next )
+     swap previous ( next previous ) !
+  else drop then
+;
+
+\ -----------------------------------------
+\ Create a new task - do not use in IRQ !
+\ -----------------------------------------
+
+: task: ( "name" -- )  stackspace cell+ 2*  4 cells +  buffer: ;
+
+: preparetask ( task continue -- )
+  swap >r ( continue R: task )
+
+    \ true  r@ 1 cells + ! \ Currently running
+      false r@ 3 cells + ! \ No handler
+
+    r@ 4 cells + stackspace + ( continue start-of-parameter-stack )
+      dup   r@ 2 cells + ! \ Start of parameter stack
+
+    dup stackspace + ( continue start-of-parameter-stack start-of-return-stack )
+    tuck      ( continue start-of-return-stack start-of-parameter-stack start-of-return-stack )
+    2 cells - ( continue start-of-return-stack start-of-parameter-stack start-of-return-stack* ) \ Adjust for saved loop index and limit
+    swap  !   ( continue start-of-return-stack ) \ Store the adjusted return stack pointer into the parameter stack
+    !         \ Store the desired entry address at top of the tasks return stack
+
+  r> insert
+;
+
+: activate ( task --   R: continue -- )
+  true over 1 cells + ! \ Currently running
+  r> preparetask
+;
+
+: background ( task --   R: continue -- )
+  false over 1 cells + ! \ Currently idling
+  r> preparetask
+;
+
+\ --------------------------------------------------
+\  Multitasking insight
+\ --------------------------------------------------
+
+\ There is a more capable variant of "tasks" in multitask-debug.txt.
+\ This one is smaller, uncomment if you wish to use it !
+
+\ : tasks ( -- ) \ Show tasks currently in round-robin list
+\   hook-pause @ singletask \ Stop multitasking as this list may be changed during printout.
+\
+\   \ Start with current task.
+\   next-task cr
+\
+\   begin
+\     ( Task-Address )
+\     dup             ." Task Address: " hex.
+\     dup           @ ." Next Task: " hex.
+\     dup 1 cells + @ ." State: " hex.
+\     dup 2 cells + @ ." Stack: " hex.
+\     dup 3 cells + @ ." Handler: " hex. cr
+\
+\     @ dup next-task = \ Stop when end of circular list is reached
+\   until
+\   drop
+\
+\   hook-pause ! \ Restore old state of multitasking
+\ ;
+
+\ --------------------------------------------------
+\  Exception handling
+\ --------------------------------------------------
+
+: catch ( x1 .. xn xt -- y1 .. yn throwcode / z1 .. zm 0 )
+  (do) \ push I and I'
+  sp@ >r handler @ >r rp@ handler !  execute
+  r> handler !  rdrop  0 unloop ;
+
+: throw ( throwcode -- )  dup IF
+  handler @ 0= IF false task-state ! THEN \ unhandled error: stop task
+  handler @ rp! r> handler ! r> swap >r sp! drop r>
+  UNLOOP  EXIT
+  ELSE  drop  THEN ;
+
+\ Requires dictionary-tools.txt
+
+\ --------------------------------------------------
+\  Multitasking insight
+\ --------------------------------------------------
+
+: tasks ( -- ) \ Show tasks currently in round-robin list
+  hook-pause @ singletask \ Stop multitasking as this list may be changed during printout.
+
+  \ Start with current task.
+  next-task cr
+
+  begin
+    ( Task-Address )
+    dup             ." Task Address: " hex.
+    dup           @ ." Next Task: " hex.
+    dup 1 cells + @ ." State: " hex.
+    dup 2 cells + @ ." Stack: " hex.
+    dup 3 cells + @ ." Handler: " hex.
+    dup             ." Name: " variable-name. cr
+
+    @ dup next-task = \ Stop when end of circular list is reached
+  until
+  drop
+
+  hook-pause ! \ Restore old state of multitasking
+;
+
+\ --------------------------------------------------
+\  Multitasking debug tools
+\ --------------------------------------------------
+
+:  depth ( -- n ) up @ boot-task = if  depth    else up @ 4 cells stackspace    + + sp@ - 2 arshift then ;
+: rdepth ( -- n ) up @ boot-task = if rdepth 1- else up @ 4 cells stackspace 2* + + rp@ - 2 arshift then ;
+
+: .s ( -- )
+  base @ >r decimal depth ." Stack: [ " . ." ] " r> base !
+  depth >r
+  begin
+    r@ 0 >
+  while
+    r@ pick .
+    r> 1- >r
+  repeat
+  rdrop
+  ."  TOS: " dup . ."  *>" cr
+;
+
+: u.s ( -- )
+  base @ >r decimal depth ." Stack: [ " . ." ] " r> base !
+  depth >r
+  begin
+    r@ 0 >
+  while
+    r@ pick u.
+    r> 1- >r
+  repeat
+  rdrop
+  ."  TOS: " dup u. ."  *>" cr
+;
+
+: h.s ( -- )
+  base @ >r decimal depth ." Stack: [ " . ." ] " r> base !
+  depth >r
+  begin
+    r@ 0 >
+  while
+    r@ pick hex.
+    r> 1- >r
+  repeat
+  rdrop
+  ."  TOS: " dup hex. ."  *>" cr
+;
+
+: .rs ( -- )
+  base @ decimal rdepth ." Returnstack: [ " . ." ] " base !
+  rdepth
+  begin
+    dup 0 >
+  while
+    dup rpick hex.
+    1-
+  repeat
+  drop
+  ."  *>" cr
+;

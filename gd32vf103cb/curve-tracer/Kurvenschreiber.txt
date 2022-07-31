@@ -1,0 +1,69 @@
+
+\ Kurvenschreiber für Longan Nano
+
+\ Benötigt basisdefinitions.txt und analog.txt
+
+\ Freie ADCs: PA0, PA3 und PA6.
+\ DACs an PA4 (frei!) und PA5 (geteilt mit dem Display, leider)
+
+\ Beschaltung:
+
+\ PA4 DAC >---
+\            |
+\          Prüfling
+\            |
+\ PA3 ADC <--o----
+\            |   |
+\           --- ---
+\  680 Ohm  | | | |  15 kOhm
+\           | | | |
+\           --- ---
+\            |   |
+\           PA0 PA6
+
+: adc0-conversion-256 ( -- u )
+  0
+  256 0 do adc0-conversion + loop
+;
+
+
+: kurve ( -- )
+
+  init-dac
+  init-adc0
+  3 ADC0_SQR3 ! \ Select channel 3
+
+  $44000444 PORTA_CRL ! \ Switch PA3, PA4 and PA5 to analog mode
+
+  cr
+
+  $1000 0 do
+    i 0 dacs
+
+    $44000442 PORTA_CRL ! \ Switch PA3, PA4 and PA5 to analog mode and PA0 to output
+
+    0 PORTA_ODR ! \ PA0 Low
+    10 0 do loop
+    adc0-conversion-256
+
+    1 PORTA_ODR ! \ PA0 High
+    10 0 do loop
+    adc0-conversion-256
+
+    $42000444 PORTA_CRL ! \ Switch PA3, PA4 and PA5 to analog mode and PA6 to output
+
+    0 PORTA_ODR ! \ PA6 Low
+    10 0 do loop
+    adc0-conversion-256
+
+    $40 PORTA_ODR ! \ PA6 High
+    10 0 do loop
+    adc0-conversion-256
+
+    ( PA0L PA0H PA6L PA6H )
+
+    i u. u. u. u. u. cr \ Ergibt: i PA6H PA6L PA0H PA0L
+  8 +loop
+
+  cr
+;

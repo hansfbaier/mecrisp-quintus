@@ -1,0 +1,14 @@
+
+: blinky ( -- )
+
+  $00000100 PORTA 22 cells + !
+  1 22 lshift GPIOA PDDR + bis!
+
+  begin
+    1 22 lshift GPIOA PSOR + !
+    200 ms
+    1 22 lshift GPIOA PCOR + !
+    300 ms
+  key? until
+;
+

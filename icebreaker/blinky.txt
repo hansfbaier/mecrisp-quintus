@@ -1,0 +1,64 @@
+
+\ -----------------------------------------------------------------------------
+\ Register definitions
+\ -----------------------------------------------------------------------------
+
+  $20000010 constant P1IN
+  $20000020 constant P1OUT
+  $20000040 constant P1DIR
+
+  $20000100 constant P2IN
+  $20000200 constant P2OUT
+  $20000400 constant P2DIR
+
+  $20001000 constant P3IN
+  $20002000 constant P3OUT
+  $20004000 constant P3DIR
+
+\ -----------------------------------------------------------------------------
+\ Delay with free running cycle counter
+\ -----------------------------------------------------------------------------
+
+: delay-ticks ( ticks -- ) \  Tick = 1 / 12 MHz = 83.3 ns
+  >r
+
+  $20040000 @ ( start R: ticks )
+
+  begin pause
+    $20040000 @ over - ( start elapsed R: ticks )
+    r@ u>=
+  until
+  drop rdrop
+;
+
+: us ( us -- ) 12 * delay-ticks ;
+: ms ( ms -- ) 0 ?do 12000 delay-ticks loop ;
+
+\ -----------------------------------------------------------------------------
+\ Ring oscillator random number generator
+\ -----------------------------------------------------------------------------
+
+: randombit ( -- 0 | 1 ) $20020000 @ 2 rshift 1 and ;
+: random ( -- x ) 0  32 0 do 2* randombit or 20 0 do loop loop ;
+
+\ -----------------------------------------------------------------------------
+\ Let it shine !
+\ -----------------------------------------------------------------------------
+
+: button1 ( -- ? ) $40 P3IN bit@ ;
+: button2 ( -- ? ) $08 P3IN bit@ ;
+: button3 ( -- ? ) $80 P3IN bit@ ;
+
+: blinky ( -- )
+  %00110111 P3DIR ! \ 5 LEDs, three buttons.
+
+  begin
+    1 P3OUT +!
+    100 ms
+
+    1 button1 and
+    2 button2 and or
+    3 button3 and or leds
+  key? until
+;
+

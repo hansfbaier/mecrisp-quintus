@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./quintusemu-pic32mx570 mecrisp-quintus-pic32mx570f512l-boot.bin mecrisp-quintus-pic32mx570f512l-text.bin

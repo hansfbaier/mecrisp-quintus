@@ -1,0 +1,18 @@
+#!/bin/bash
+
+rm -f icestorm/build/*
+
+echo "Synthesize design..."
+
+if
+  yosys  -q -p "synth_ice40 -top femtosoc -json icestorm/build/femtosoc.json -blif icestorm/build/femtosoc.blif -abc9 -abc2 -relut" icestorm/femtosoc.v;
+then
+  echo "Place and Route..."
+  nextpnr-ice40 --freq 48 --hx1k --package tq144 --asc icestorm/build/femtosoc.txt --pcf icestorm/icestick.pcf --json icestorm/build/femtosoc.json --ignore-loops --pcf-allow-unconstrained --seed 11
+  echo "Create Bitstream..."
+  icepack icestorm/build/femtosoc.txt icestorm/build/femtosoc0.bin
+  icemulti -p0 icestorm/build/femtosoc0.bin > femtosoc.bin
+  echo "Finished."
+fi
+
+rm -f icestorm/build/*

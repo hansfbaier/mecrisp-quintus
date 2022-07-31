@@ -1,0 +1,75 @@
+
+-------------------------------------------------------------------------------
+  Notes for Sipeed Longan Nano
+-------------------------------------------------------------------------------
+
+Connect a 3.3V terminal bridge to T0 and R0 of the board:
+
+3V3
+R0   -- TXD
+T0   -- RXD
+GND  -- GND
+
+Supply power either to 3V3 pin or through the USB connector
+
+* Press and hold BOOT0 button
+* Press and release Reset button
+* Release BOOT0 button
+
+Flash Mecrisp-Quintus, choose one:
+
+./stm32loader.py -e -w -v -p /dev/ttyUSB0 mecrisp-quintus-gd32vf103cb.bin
+./stm32loader.py -e -w -v -p /dev/ttyUSB0 mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin
+
+Press and release Reset button to start Forth.
+
+Use the terminal bridge you just connected with 115200 baud 8N1.
+
+-------------------------------------------------------------------------------
+
+If you wish to conserve it, read original firmware image before flashing Mecrisp-Quintus with:
+
+./stm32loader.py -r -a  0x08000000 -l 0x20000 -p /dev/ttyUSB0 Longan-Nano-Firmware.bin
+
+-------------------------------------------------------------------------------
+
+Flashing is also possible using the USB connection.
+You have to use the DFU-UTIL as packages by Sipeed, which you'll find here:
+
+https://pramode.in/2019/10/07/rust-on-riscv-board-sipeed-longan-nano/
+http://dl.sipeed.com/LONGAN/platformio/dl-packages/tool-gd32vflash-v0.1.0-linux.tar.gz
+
+Connect USB, press and hold Boot, press and release Reset, release Boot.
+
+dfu-util -a 0 -d 28e9:0189 -s 0x8000000:mass-erase:force -D mecrisp-quintus-gd32vf103cb.bin
+dfu-util -a 0 -d 28e9:0189 -s 0x8000000:mass-erase:force -D mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin
+
+Press and release Reset button to start Forth.
+
+
+-------------------------------------------------------------------------------
+  Notes for GD32VF103C-START  (same chip on a different board)
+-------------------------------------------------------------------------------
+
+JP1 (BOOT1) on position L
+JP4 (BOOT0) on position H
+
+Connect two USB cables:
+
+- Everything gets power from the GD-Link.
+- Connect the other one to "OTG" port for flashing
+
+Press and release reset.
+
+dfu-util -i 0 -a 0 -s 0x08000000 -D mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin
+
+When done successfully, move the USB cable from "OTG" to the USB port labeled "USART".
+
+JP1 on position L
+JP4 on position L
+
+Add one more jumper to JP2 between the middle pin and "Usart".
+
+Press and release Reset button to start Forth.
+
+Communication is via the onboard USB-serial bridge using 115200 baud 8N1.

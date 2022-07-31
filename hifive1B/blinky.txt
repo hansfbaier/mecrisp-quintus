@@ -1,0 +1,38 @@
+
+$10012000 constant GPIOBASE
+
+GPIOBASE $00 + constant GPIO_VALUE    
+GPIOBASE $04 + constant GPIO_INPUT_EN 
+GPIOBASE $08 + constant GPIO_OUTPUT_EN
+GPIOBASE $0C + constant GPIO_PORT     
+GPIOBASE $10 + constant GPIO_PUE      
+GPIOBASE $38 + constant GPIO_IOF_EN   
+GPIOBASE $3C + constant GPIO_IOF_SEL  
+GPIOBASE $40 + constant GPIO_OUT_XOR  
+
+\ Common Anode tied to Vcc. LEDs shine on low.
+\   GPIO 19: Green LED
+\   GPIO 21: Blue LED
+\   GPIO 22: Red LED 
+
+: blinky ( -- )
+
+  1 19 lshift
+  1 21 lshift or
+  1 22 lshift or GPIO_OUTPUT_EN !
+
+  begin
+
+    1 21 lshift
+    1 22 lshift or GPIO_PORT !
+
+    4000000 0 do loop
+
+    1 19 lshift
+    1 21 lshift or
+    1 22 lshift or GPIO_PORT !
+
+    4000000 0 do loop
+    
+  key? until
+;

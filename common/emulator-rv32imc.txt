@@ -1,0 +1,394 @@
+
+\ RISC-V 32 IMC Emulator, Copyright (C) 2020  Matthias Koch
+\ This is free software under GNU General Public License v3.
+
+\ Requires disassembler-rv32imc.
+
+\ -----------------------------------------------------------------------------
+\  Emulator infrastructure
+\ -----------------------------------------------------------------------------
+
+32 cells buffer: registers
+32 cells buffer: registers-previous
+
+: rs1@ ( -- x ) inst 15 rshift $1F and dup if cells registers + @ then ;
+: rs2@ ( -- x ) inst 20 rshift $1F and dup if cells registers + @ then ;
+: rd!  ( x -- ) inst  7 rshift $1F and dup if cells registers + ! else 2drop then ;
+
+\ -----------------------------------------------------------------------------
+\  Emulator logic
+\ -----------------------------------------------------------------------------
+
+: execute-load ( -- )
+  funct3
+  case
+    0 of rs1@ imm_i + c@signed rd! endof  \ lb
+    1 of rs1@ imm_i + h@signed rd! endof  \ lh
+    2 of rs1@ imm_i +  @       rd! endof  \ lw
+    4 of rs1@ imm_i + c@       rd! endof  \ lbu
+    5 of rs1@ imm_i + h@       rd! endof  \ lhu
+  endcase
+;
+
+: execute-immediate ( -- )
+  funct3
+  case
+    0 of rs1@ imm_i               + rd! endof       \ addi
+    1 of rs1@ imm_i          lshift rd! endof       \ slli
+    2 of rs1@ imm_i             slt rd! endof       \ slti
+    3 of rs1@ imm_i            sltu rd! endof       \ sltiu
+    4 of rs1@ imm_i             xor rd! endof       \ xori
+    5 of inst 26 rshift 16 = if
+         rs1@ imm_i $1F and arshift rd! else        \ srai
+         rs1@ imm_i          rshift rd! then endof  \ srli
+    6 of rs1@ imm_i              or rd! endof       \ ori
+    7 of rs1@ imm_i             and rd! endof       \ andi
+  endcase
+;
+
+: execute-auipc ( -- )
+  disasm-$ @ imm_u + rd!
+;
+
+: execute-store ( -- )
+  funct3
+  case
+    0 of rs2@ rs1@ imm_s + c! endof  \ sb
+    1 of rs2@ rs1@ imm_s + h! endof  \ sh
+    2 of rs2@ rs1@ imm_s +  ! endof  \ sw
+  endcase
+;
+
+: mulhsu ( x1 x2 -- x )
+[
+  $0004A783 ,  \ lw     x15, 0 (x9)
+  $00448493 ,  \ addi   x9, x9, 4
+  $0287A433 ,  \ mulhsu x8, x15, x8
+] inline 2-foldable ;
+
+: execute-register ( -- )
+  funct7 1 = \ Multiplication & Division RV32M
+  if
+    funct3
+    case
+      0 of rs1@ rs2@     *      rd! endof  \ mul
+      1 of rs1@ rs2@    m*  nip rd! endof  \ mulh
+      2 of rs1@ rs2@ mulhsu     rd! endof  \ mulhsu
+      3 of rs1@ rs2@   um*  nip rd! endof  \ mulhu
+      4 of rs1@ rs2@  /         rd! endof  \ div
+      5 of rs1@ rs2@ u/mod  nip rd! endof  \ divu
+      6 of rs1@ rs2@  /mod drop rd! endof  \ rem
+      7 of rs1@ rs2@ u/mod drop rd! endof  \ remu
+    endcase
+  else
+    funct3
+    case
+      0 of funct7 32 = if
+           rs1@ rs2@       - rd! else         \ sub
+           rs1@ rs2@       + rd! then endof   \ add
+      1 of rs1@ rs2@  lshift rd! endof        \ sll
+      2 of rs1@ rs2@     slt rd! endof        \ slt
+      3 of rs1@ rs2@    sltu rd! endof        \ sltu
+      4 of rs1@ rs2@     xor rd! endof        \ xor
+      5 of funct7 32 = if
+           rs1@ rs2@ arshift rd! else         \ sra
+           rs1@ rs2@  rshift rd! then endof   \ srl
+      6 of rs1@ rs2@      or rd! endof        \ or
+      7 of rs1@ rs2@     and rd! endof        \ and
+    endcase
+  then
+;
+
+: execute-lui ( -- )
+  imm_u rd!
+;
+
+: execute-branch ( -- )
+  funct3
+  case
+    0 of rs1@ rs2@   = if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ beq
+    1 of rs1@ rs2@  <> if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bne
+    4 of rs1@ rs2@   < if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ blt
+    5 of rs1@ rs2@  >= if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bge
+    6 of rs1@ rs2@  u< if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bltu
+    7 of rs1@ rs2@ u>= if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bgeu
+  endcase
+;
+
+: execute-jalr ( -- )
+  disasm-$ @ 4 + rd!
+  rs1@ imm_i + disasm-$ !
+;
+
+: execute-jal ( -- )
+  disasm-$ @ 4 + rd!
+  imm_uj disasm-$ +!
+;
+
+: execute-ecall ( -- ) \ Dies ist nur für die Linux-Variante wichtig, um Syscalls abfangen zu können.
+
+  registers 17 cells + @ 64 =
+  if
+    registers 11 cells + @ @ emit
+    exit
+  then
+
+  registers 17 cells + @ 63 =
+  if
+    key registers 11 cells + @ !
+    exit
+  then
+
+;
+
+\ -----------------------------------------------------------------------------
+\   Extensions for executing compressed instructions
+\ -----------------------------------------------------------------------------
+
+: crs1@  ( -- x ) rvc-inst 7 rshift  $7 and 8 + cells registers + @ ;
+: crs2@  ( -- x ) rvc-inst 2 rshift  $7 and 8 + cells registers + @ ;
+: crd1!  ( x -- ) rvc-inst 7 rshift  $7 and 8 + cells registers + ! ;
+: crd2!  ( x -- ) rvc-inst 2 rshift  $7 and 8 + cells registers + ! ;
+
+: crs1l@ ( -- x ) rvc-inst 7 rshift $1F and     cells registers + @ ;
+: crs2l@ ( -- x ) rvc-inst 2 rshift $1F and     cells registers + @ ;
+: crdl!  ( x -- ) rvc-inst 7 rshift $1F and     cells registers + ! ;
+
+: execute-compressed ( -- )
+    rvc-inst 3 and
+    case
+      %00 of
+            rvc-func3
+            case
+              %000 of rvc-inst 0= if                               else       \ c.illegal
+                      2 cells registers + @  imm_addi4spn +  crd2! then endof \ c.addi4spn
+
+              %010 of       crs1@ imm_clwsw + @ crd2!  endof \ c.lw
+              %110 of crs2@ crs1@ imm_clwsw + !        endof \ c.sw
+              \ ." Unknown compressed quadrant 0 opcode"
+            endcase
+            2 disasm-$ +!
+          endof
+
+      %01 of
+            rvc-func3
+            case
+              %000 of crs1l@ imm_c + crdl!  2 disasm-$ +! endof \ c.addi
+              %010 of        imm_c   crdl!  2 disasm-$ +! endof \ c.li
+
+              %110 of crs1@ 0=  if imm_cb else 2 then disasm-$ +! endof \ c.beqz
+              %111 of crs1@ 0<> if imm_cb else 2 then disasm-$ +! endof \ c.bnez
+
+              %001 of disasm-$ @ 2 +  1 cells registers + !  imm_cj disasm-$ +! endof \ c.jal
+              %101 of                                        imm_cj disasm-$ +! endof \ c.j
+
+              %011 of rvc-inst 7 rshift $1F and 2 =
+                      if   2 cells registers + @  imm_addi16sp +  crdl!  \ c.addi16sp
+                      else                        imm_c 12 lshift crdl!  \ c.lui
+                      then
+                      2 disasm-$ +!
+                   endof
+
+              %100 of
+                     rvc-inst $0C00 and $0000 = if crs1@ imm_cu  rshift crd1! then \ c.srli
+                     rvc-inst $0C00 and $0400 = if crs1@ imm_cu arshift crd1! then \ c.srai
+                     rvc-inst $0C00 and $0800 = if crs1@ imm_c      and crd1! then \ c.andi
+                     rvc-inst $1C00 and $0C00 =
+                     if
+                       rvc-inst 5 rshift 3 and
+                       case
+                         %00 of crs1@ crs2@   - crd1! endof \ c.sub
+                         %01 of crs1@ crs2@ xor crd1! endof \ c.xor
+                         %10 of crs1@ crs2@  or crd1! endof \ c.or
+                         %11 of crs1@ crs2@ and crd1! endof \ c.and
+                       endcase
+                     then
+                     2 disasm-$ +!
+                   endof
+
+              2 disasm-$ +! \ ." Unknown compressed quadrant 1 opcode"
+            endcase
+          endof
+
+      %10 of
+            rvc-func3
+            case
+              %000 of crs1l@ imm_cu lshift crdl!                        2 disasm-$ +! endof \ c.slli
+              %010 of        2 cells registers + @  imm_csl + @  crdl!  2 disasm-$ +! endof \ c.lwsp
+              %110 of crs2l@ 2 cells registers + @  imm_css + !         2 disasm-$ +! endof \ c.swsp
+
+              %100 of
+                     rvc-inst $1000 and
+                     if
+                       rvc-inst 2 rshift $3FF and 0=
+                       if
+                         2 disasm-$ +! \ c.ebreak
+                       else
+                         rvc-inst 2 rshift $1F and 0=
+                         if   disasm-$ @ 2 +  1 cells registers + !  crs1l@ disasm-$ ! \ c.jalr
+                         else crs1l@ crs2l@ + crdl! 2 disasm-$ +!                      \ c.add
+                         then
+                       then
+                     else
+                       rvc-inst 2 rshift $1F and 0=
+                       if   crs1l@ disasm-$ !           \ c.jr
+                       else crs2l@ crdl! 2 disasm-$ +!  \ c.mv
+                       then
+                     then
+                   endof
+
+              2 disasm-$ +! \ ." Unknown compressed quadrant 2 opcode"
+            endcase
+          endof
+    endcase
+;
+
+
+\ -----------------------------------------------------------------------------
+\   Single step instruction set emulator
+\ -----------------------------------------------------------------------------
+
+: execute-step ( -- ) \ Executes one machine instruction and advances disasm-$
+
+  inst 3 and 3 <> if execute-compressed exit then \ Compressed Opcodes
+
+  inst $7F and
+  case
+    $03 of execute-load      4 disasm-$ +! endof
+    $13 of execute-immediate 4 disasm-$ +! endof
+    $17 of execute-auipc     4 disasm-$ +! endof
+    $23 of execute-store     4 disasm-$ +! endof
+    $33 of execute-register  4 disasm-$ +! endof
+    $37 of execute-lui       4 disasm-$ +! endof
+    $63 of execute-branch    endof
+    $67 of execute-jalr      endof
+    $6F of execute-jal       endof
+    $73 of execute-ecall     4 disasm-$ +! endof \ Emulate ECALL in emit and key.
+
+    4 disasm-$ +! \ Skip unknown opcodes
+  endcase
+;
+
+
+\ -----------------------------------------------------------------------------
+\  ANSI Escape Codes For Colourful Emissions
+\ -----------------------------------------------------------------------------
+
+: u.base10 ( u -- ) base @ decimal swap 0 <# #s #> type base ! ;
+: ESC[ ( -- ) 27 emit 91 emit ;
+: at-xy ( column row -- ) 1+ swap 2* 1+ swap ESC[ u.base10 ." ;" u.base10 ." H" ;
+: page ESC[ ." 2J" 0 0 at-xy ;
+
+: hide-cursor esc[ ." ?25l" ;
+: show-cursor esc[ ." ?25h" ;
+
+: default  ( -- ) ESC[ ." 0m"  ;
+: bold     ( -- ) ESC[ ." 1m"  ;
+
+: black    ( -- ) ESC[ ." 30m" ;
+: red      ( -- ) ESC[ ." 31m" ;
+: green    ( -- ) ESC[ ." 32m" ;
+: yellow   ( -- ) ESC[ ." 33m" ;
+: blue     ( -- ) ESC[ ." 34m" ;
+: magenta  ( -- ) ESC[ ." 35m" ;
+: cyan     ( -- ) ESC[ ." 36m" ;
+: white    ( -- ) ESC[ ." 37m" ;
+
+: rgb      ( -- ) ESC[ ." 38;2;" rot u.base10 ." ;" swap u.base10 ." ;" u.base10 ." m" ;
+
+\ -----------------------------------------------------------------------------
+\  Printing of register contents
+\ -----------------------------------------------------------------------------
+
+: register.r ( x -- )
+  >r
+  r@ 1 >= r@ 9 <= and if space space then
+  r@ 10 >= if space then
+  r> register.
+;
+
+: printregs ( -- )
+
+  base @
+
+  32 0 do
+    i 7 and 0= if cr then
+    i register.r space
+    i cells registers + @
+      dup i cells registers-previous + @ = if blue else red then
+      dup $5A5A5A5A = if default then
+    hex.
+    default
+  loop
+  cr cr
+
+  disasm-$ @ disasm-step disasm-$ ! \ Disassemble current Instruction
+
+  registers registers-previous 32 cells move
+
+  base !
+;
+
+\ -----------------------------------------------------------------------------
+\  Run a definition in emulator
+\ -----------------------------------------------------------------------------
+
+\ The emulator executes instructions which may alter the stacks.
+\ But the execution of the emulator requires stack access, too !
+\ Therefore, the emulator switches the hardware stacks to spare locations before.
+
+256 cells buffer: emu-stack
+256 cells buffer: emu-rstack
+
+false variable emulator-verbose
+
+: run-emulator ( -- )
+
+  \ -----------------------------------------------------------
+  \ Vorbereiten des Emulators für den Lauf mit dieser Definition
+
+  registers 32 cells $5A fill \ Alle Register im Emulator vorbelegen, um Fehler leichter sehen zu können
+
+          0 registers 0 cells + !  \ x0=zero
+  $DEADBEEF registers 1 cells + !  \ x1=lr auf einen magischen Rücksprungwert setzen
+        rp@ registers 2 cells + !  \ x2 bekommt den Returnstackpointer übergeben
+
+                                   \ Noch einen Zauber mit (do) und (unloop) machen, wie im Multitasker, damit die Schleifen übernommen werden können ?
+
+            registers 8 cells + !  \ TOS bereitlegen
+        sp@ registers 9 cells + !  \ Und den Datenstackpointer verdrahten.
+
+        \ Der Rest sind alles temporäre Register... Die braucht der Emulator nicht.
+
+  registers registers-previous 32 cells move
+
+  \ -----------------------------------------------------------
+  \ Der Emulator selbst benötigt nun neue Stacks, weil die emulierte Definition die "normalen" Stacks weiterbenutzt.
+
+  emu-stack  256 cells + sp!
+  emu-rstack 256 cells + rp!
+
+  \ -----------------------------------------------------------
+  \ Ausführen der gewünschten Definition im Emulator
+  begin
+    emulator-verbose @ if printregs then
+    execute-step
+    disasm-$ @ $DEADBEEF = \ Irgendwann wird die Definition zurückkehren, und dann den magischen Wert, der am Anfang in LR war, in PC laden.
+  until
+
+  \ -----------------------------------------------------------
+  \ Rückholen der veränderten Register aus dem Emulator:
+
+  registers 9 cells + @ sp! \ Datenstackpointer zurückholen
+  registers 8 cells + @     \ TOS zurückholen
+
+                            \ Noch einen Zauber mit (do) und (unloop) machen, wie im Multitasker, damit die Schleifen übernommen werden können ?
+
+  registers 2 cells + @ rp! \ Returnstackpointer zurückholen
+;
+
+
+: step        ( -- ) ' disasm-$ ! cr true  emulator-verbose ! run-emulator ;
+: step-silent ( -- ) ' disasm-$ ! cr false emulator-verbose ! run-emulator ;
+
+\ -----------------------------------------------------------------------------

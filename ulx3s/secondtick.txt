@@ -1,0 +1,10 @@
+
+$40040000 constant ticks
+$40080000 constant reload
+
+: tick ( -- ) 2 leds-out toggle ;
+
+' tick irq-collection !
+
+  -40000000 reload !     \ Reload value for timer which counts up and triggers interrupt on overflow.
+         -1 ticks  ! eint \ Trigger interrupt now by setting the cycle counter.

@@ -1,0 +1,38 @@
+\ tft-simple-graphics.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+
+\ ------------------------------------------------
+\ ------ include graphics-unicode-xxx.txt --------
+\ ------------------------------------------------
+
+\ The following words are needed by graphics-unicode-xxx.txt
+\ If you want to include it go into the file(s) .../common/graphics-unicode-xxx.txt
+\ delete or comment out these lines:
+
+ \   : u.base10 ( u -- ) base @ decimal swap 0 <# #s #> type base ! ;
+ \   : ESC[ ( -- ) 27 emit 91 emit ;
+ \   : at-xy ( column row -- ) 1+ swap 1+ swap ESC[ u.base10 ." ;" u.base10 ." H" ;
+ \   : page ESC[ ." 2J" 0 0 at-xy ;
+
+ \ : putpixel ( x y -- )  at-xy [char] * emit ;
+
+\ Than choose the colors you want for back- and foreground
+\ in 'page' and 'putpixel' below.
+
+ : page ( -- ) white tft-clear ;
+ : putpixel  ( x y -- )  black 1 1 filled-rectangle ;
+
+\ Now choose the font you want to use by including/loading
+\ the correspondenting files graphics-unicode-8x8.txt
+\ or graphics-unicode-8x16.txt
+\  #include graphics-unicode-8x16.txt
+
+\ : show-german-umlaute ( -- )
+\  s" >ÄÖÜäöüß<" 14 50 drawstring ;
+
+
+ 

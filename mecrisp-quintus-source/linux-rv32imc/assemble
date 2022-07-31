@@ -1,0 +1,5 @@
+#!/bin/bash
+
+riscv64-linux-gnu-as -o mecrisp-quintus-linux-rv32imc.o mecrisp-quintus-linux-rv32imc.s -march=rv32im
+riscv64-linux-gnu-ld -T mecrisp.ld -z max-page-size=4096 -o mecrisp-quintus-linux-rv32imc mecrisp-quintus-linux-rv32imc.o -m elf32lriscv
+riscv64-linux-gnu-objdump -Mnumeric -D mecrisp-quintus-linux-rv32imc > mecrisp-quintus-linux-rv32imc.list

@@ -1,0 +1,52 @@
+
+
+task: blink-red
+
+: blink-red& ( -- )
+  $00000100 PORTA 24 cells + !
+  1 24 lshift GPIOA PDDR + bis!
+
+  blink-red activate
+    begin
+      1 24 lshift GPIOA PSOR + !
+      100 ms
+      1 24 lshift GPIOA PCOR + !
+      220 ms
+    again
+;
+
+task: blink-green
+
+: blink-green& ( -- )
+  $00000100 PORTA 23 cells + !
+  1 23 lshift GPIOA PDDR + bis!
+
+  blink-green activate
+    begin
+      1 23 lshift GPIOA PSOR + !
+      200 ms
+      1 23 lshift GPIOA PCOR + !
+      320 ms
+    again
+;
+
+task: blink-blue
+
+: blink-blue& ( -- )
+  $00000100 PORTA 22 cells + !
+  1 22 lshift GPIOA PDDR + bis!
+
+  blink-blue activate
+    begin
+      1 22 lshift GPIOA PSOR + !
+      300 ms
+      1 22 lshift GPIOA PCOR + !
+      540 ms
+    again
+;
+
+multitask
+blink-red&
+blink-green&
+blink-blue&
+

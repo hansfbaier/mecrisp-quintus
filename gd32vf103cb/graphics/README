@@ -1,0 +1,258 @@
+#
+#    Mecrisp-Quintus - A native code Forth implementation for RISC-V
+#    Copyright (C) 2018  Matthias Koch
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+Mecrisp-Quintus: A native code RISC-V Forth, currently for RISC-V 32 IM(C) and MIPS M4K.
+
+HIC SUNT DRACONES - HIC SUNT DRACONES - HIC SUNT DRACONES
+
+This still an early experimental release, so beware: Monsters may be inside !
+
+--------------------------------------------------------------------------------------
+
+This paket of forth source codes is called 'pixelmaler-v0.1'.
+It contains a driver and two applications for the tft-display shipped with
+the Sipeed Longan Nano. It can be used as an example for every display connected
+via the driver chip ST7735. All writing commands are installed.
+See: "driver chip ST7735S_V1.5_20150303.pdf"(1)
+As the display on the Sipeed Longan Nano is fixed wired (in fact the connector is)
+some of its features are not available.
+
+--------------------------------------------------------------------------------------
+
+Contents
+
+This paket consist of
+
+|----------------------------+------------------------------------------------------------+----------------|
+| file name                  | description                                                | demo word(s)   |
+|----------------------------+------------------------------------------------------------+----------------|
+| drache36.bmp               | picture ready for use with pixelmaler-v0.1                 |                |
+| dump.fs                    | needed by mysdcard2.txt                                    |                |
+| fixpt-math-lib.fs          | needed by tft-bmp (only mecrisp-quintus-gd32vf103cb.bin)   |                |
+| flower.bmp                 | picture ready for use with pixelmaler-v0.1                 |                |
+| gd32vf103-104mhz.fs        | convenience, needs ms                                      |                |
+| graphics-unicode-8x16.txt  | copy of same file in .../common/ (sligtly changed)         | demo           |
+| graphics-unicode-8x8.txt   | copy of same file in .../common/ (sligtly changed)         | demo           |
+| Lat15-Terminus32x16.mfnt   | a PSF2 font convertet with gforth/psf.fs                   |                |
+| manhattan.fs               | application example                                        | manhattan-demo |
+| mecrisp-fonts.txt          | fonts from Matthias's graphics-unicodexxx examples         |                |
+| ms.fs                      | ms and us; counting clock of bumblebee kernal              |                |
+| mysdcard2.txt              | needed by tft-bmp                                          |                |
+| psf.fs                     | gforth program to convert PSF2 font for this pakage        |                |
+| README                     | this file                                                  |                |
+| spi0-hard.txt              | spi module of gd32vf103 needed by tft-basics               |                |
+| spi0-soft.txt              | software approach for SPI, allows to read from the ST7735S |                |
+| tft-basics.txt             | basic routines to communicate with ST7735S                 | color-demo     |
+| tft-bmp.txt                | display Windows Bitmap pictures                            | bmp-demo       |
+| tft-fonts.txt              | display several fonts at one time                          | font-demo      |
+| tft-graphics.txt           | graphic routines: line, ellipse, circle                    | graphics-demo  |
+| tft-ram-simple-suite.txt   | load file for RAM                                          |                |
+| tft-ram-with-bmp-suite.txt | load file for RAM                                          |                |
+| tft-ram-wo-bmp-suite.txt   | load file for RAM                                          |                |
+| tft-scroll.txt             | scrolls using built-in feature of ST7735S                  | scroll-demo    |
+| tft-simple-graphics.txt    | needed for graphics-unicode-xxx                            |                |
+| tft-suite.txt              | load file for flash                                        |                |
+| turtle.fs                  | application example                                        | turtle-demo    |
+| xy-hard.txt                | calculating coordinates (hard coded assembler)             |                |
+| xy-high-level.txt          | calculating coordinates (hig-level forth)                  |                |
+| xy.txt                     | calculating coordinates (mecrisp assembler)                |                |
+|----------------------------+------------------------------------------------------------+----------------|
+
+
+
+If you want xy.txt installed you will need .../common/assembler-rv32im.txt
+
+--------------------------------------------------------------------------------------
+
+Install
+
+I highly recommend that you use mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin
+as your platform(2). Just load tft-suite.txt into your Mecrisp-Quintus. 'Load' is easy
+spoken if you use a terminal-tool like e4thcom by Manfred Mahlow(3). This terminal knows a
+command '#include' on that I count in the file tft-suite.txt. If you use another tool for
+that purpose you have to fiddle out how to change tft-suite.txt to your needs. You can use
+the dependencies chart below to decide which parts of the suite you want to install. I
+apologize that I can't give any hints for Windows or Mac users. If you got experiences
+let me know.
+
+For the hardened amongst you there are some load-files starting with tft-ram-... . These
+files show how to install parts of driver into RAM. With this load-file(s) you can use
+mecrisp-quintus-gd32vf103cb.bin which uses less memory. Even if you do so I recommend to
+load the datas of used fonts into flash.
+
+Whatever you do, I recommend using (load) gd32vf103-104mhz.fs. It sets the gd32vf103bc to
+a clock rate of 104MHz and the baud rate to 115200. If you run the gd32vf103bc at 8MHz
+you can take a coffe break during the installation process. Dislaying graphics on the
+display will also get much faster.
+
+--------------------------------------------------------------------------------------
+
+Comments
+
+The source codes are sparingly commented. But I recommend reading the comments. More
+detailed discussions will be found in the future (I hope so) in the magazine
+"Vierte Diemension" that is also available online(4).
+
+--------------------------------------------------------------------------------------
+
+Feedback
+
+You can give me feedback via martin.bitter@t-online.de (address may change).
+As I'm not a native speaker of English corrections and hints concerning typos and
+grammar are welcome.
+If you have suggestions about renaming some words or if you find any bugs in
+code let me know!
+If you have enhancements of the programs share them with me.
+
+If you play around with turtle.fs and by chance write some examples of Lindenmayer system
+- I would be glad to see them.
+
+--------------------------------------------------------------------------------------
+
+Remark
+
+This work is mixed up with sources for gd32vf103 and stm32f103. In codes dealing with
+the peripheral of the MCU there are very small differences between this MCUs. The greatest
+and most disapointing differences lay in the documentation. So it happens that there are
+sometime two names for the registers. This is due to the fact that sipeed changed nearly
+every registername in their documents(5). In spite of the documents of stm32 MCUs being
+sometimes more precise and clear we will use in future only the names that sipeed
+introduced in their documents.
+
+--------------------------------------------------------------------------------------
+
+Dependency Charts
+
+Dependency chart for flash with mecrisp-quintus-gd32vf103cb.bin
+
+                                     +---------------- neither - nor ------------------+
+                                     |                                                 |
+                           +---------------------+                           +---------------------+
+                           | ms.txt              |                           | ms.txt              |
+                           +---------------------+                           +---------------------+
+                                     |                                                 |
+                          +-----------------------+                         +-----------------------
+                          | (gd32vf103-104mhz.fs) |                         | (gd32vf103-104mhz.fs)|
+                          +-----------------------+                         +-----------------------
+                                     |                                                 |
+                           +---------------------+   +------------------+    +---------------------+
+                           | spi0-hard.txt       |   | xy-hard.txt      |    | spi0-soft.txt       |
+                           +---------------------+   +------------------+    +---------------------+
+                                     |                       |                         |
+                                     |                       |                         |
++--------------------------------------------------------------------------------------------------------------------+
+|                                                   tft-basics.txt                                                   |
++--------------------------------------------------------------------------------------------------------------------+
+                                                          |
+                                                          |
+                                                          |
++--------------------------------------------------------------------------------------------------------------------+
+|                                                  tft-graphics.txt                                                  |
++--------------------------------------------------------------------------------------------------------------------+
+             |                  |                     |                 |            |                |
+             |                  |                     |                 |    +-------------------+    |
+             |                  |                     |                 |    | fixpt-math-lib.fs |    |
+             |                  |                     |                 |    +-------------------+    |
+             |                  |                     |                 |            |                |
++--------------------------+    |            +------------------+       |            |    +--------------------------+
+| Lat15-Terminus32x16.mfnt |    |            | mysdcard2.txt    |       |            |    | tft-simple-graphics.txt  |
+| mecrisp-fonts.txt        |    |            +------------------+       |            |    +--------------------------+
++--------------------------+    |                     |                 |            |                |
+             |                  |                     |                 |            |    +--------------------------+
+             |                  |                     |                 |            |    | graphics-unicode-8x..txt |
+             |                  |                     |                 |            |    +--------+-----+-----------+
+             |                  |                     |                 |            |             | END |
+             |                  |                     |                 |            |             +-----+
+             |                  |                     |                 |            |
++----------------+    +----------------+    +------------+    +--------------+   +-----------+   /  can be
+| tft-fonts.txt  |----| tft-scroll.txt |----| tft-bmptxt |----| manhattan.fs |---| turtle.fs |  <  used all together
++----------------+    +----------------+    +------------+    +--------------+   +-----------+   \  at one time
+
+
+
+Dependency chart for ram with mecrisp-quintus.bin
+
+                                     +---------------- neither - nor ------------------+
+                                     |                                                 |
+                           +---------------------+                           +---------------------+
+                           | ms.txt              |                           | ms.txt              |
+                           +---------------------+                           +---------------------+
+                                     |                                                 |
+                            ( define dummies )                                 ( define dummies )
+                            (  : Flamingo ;  )                                 (  : Flamingo ;  )
+                            (    : init ;    )                                 (    : init ;    )
+                                     |                                                 |
+                                     |                                                 |
+                          +-----------------------+                         +-----------------------
+                          | (gd32vf103-104mhz.fs) |                         | (gd32vf103-104mhz.fs)|
+                          +-----------------------+                         +-----------------------
+                                     |                                                 |
+                           +---------------------+   +------------------+    +---------------------+
+                           | spi0-hard.txt       |   | xy-hard.txt      |    | spi0-soft.txt       |
+                           +---------------------+   +------------------+    +---------------------+
+                                     |                       |                         |
+                                     |                       |                         |
+                                     |                       |                         |
++--------------------------------------------------------------------------------------------------------------------+
+|                                                   tft-basics.txt                                                   |
++--------------------------------------------------------------------------------------------------------------------+
+                                                          |
+                                                          |
+                                                          |
++--------------------------------------------------------------------------------------------------------------------+
+|                                                  tft-graphics.txt                                                  |
++--------------------------------------------------------------------------------------------------------------------+
+             |                  |                     |                   |            |                |
+             |                  |                     |                   |            |                |
++--------------------------+    | ( define registers                    ) |            |    +--------------------------+
+| Lat15-Terminus32x16.mfnt |    | ( $40010C00 constant PORTB_Base       ) |            |    | tft-simple-graphics.txt  |
+| mecrisp-fonts.txt        |    | ( PORTB_BASE $04 + constant PORTB_CRH ) |            |    +--------------------------+
++--------------------------+    | ( PORTB_BASE $08 + constant PORTB_IDR ) |            |                |
+             |                  | ( PORTB_BASE $10 + constant PORTB_BSRR) |            |    +--------------------------+
+             |                  | ( PORTB_BASE $14 + constant PORTB_BRR ) |            |    | graphics-unicode-8x..txt |
+             |                  |                     |                   |            |    +--------+-----+-----------+
+             |                  |                     |                   |            |             | END |
+             |                  |                     |                   |            |             +-----+
+             |                  |            +------------------+         |    +-------------------+
+             |                  |            | mysdcard2.txt    |         |    | fixpt-math-lib.fs |
+             |                  |            +------------------+         |    +-------------------+
+             |                  |                     |                   |            |
++----------------+    +----------------+    +------------+    +--------------+   +-----------+   /  can not be
+| tft-fonts.txt  |    | tft-scroll.txt |    | tft-bmptxt |    | manhattan.fs |   | turtle.fs |  <  used all together
++----------------+    +----------------+    +------------+    +--------------+   +-----------+   \  at one time
+
+
+--------------------------------------------------------------------------------------------------
+
+At last not least!
+
+Play and enjoy!
+May the forth be with you!
+
+MB
+
+--------------------------------------------------------------------------------------------------
+
+1. https://dl.sipeed.com/LONGAN/Nano/HDK
+2. mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin has a lot of benifits as
+   predefined constants for registers, init (that will save somethings at reset),
+   cornerstone (that allows you to 'forget' parts of code).
+3. e4thcom is written by Manfred Mahlow. It is available at: https://wiki.forth-ev.de/doku.php/projects:e4thcom
+4. https://forth-ev.de/wiki/vd-archiv It will be in German. Use https://www.deepl.com/translator
+5. https://dl.sipeed.com/LONGAN/Nano/DOC/GD32VF103_User_Manual_CN_V1.2.pdf

@@ -1,0 +1,49 @@
+# 12 MHz clock
+set_io oscillator 35
+
+# RS232
+set_io ser_rx      6
+set_io ser_tx      9
+
+# SPI Flash
+set_io flash_clk  15
+set_io flash_csb  16
+set_io flash_io0  14
+set_io flash_io1  17
+set_io flash_io2  12
+set_io flash_io3  13
+
+# Onboard LEDs and button
+set_io button     10
+set_io ledr_n     11
+set_io ledg_n     37
+
+# PMOD 1A
+set_io PORTA0      4
+set_io PORTA1      2
+set_io PORTA2     47
+set_io PORTA3     45
+set_io PORTA4      3
+set_io PORTA5     48
+set_io PORTA6     46
+set_io PORTA7     44
+
+# PMOD 1B
+set_io PORTB0     43
+set_io PORTB1     38
+set_io PORTB2     34
+set_io PORTB3     31
+set_io PORTB4     42
+set_io PORTB5     36
+set_io PORTB6     32
+set_io PORTB7     28
+
+# PMOD 2
+set_io PORTC0     27
+set_io PORTC1     25
+set_io PORTC2     21
+set_io PORTC3     19
+set_io PORTC4     26
+set_io PORTC5     23
+set_io PORTC6     20
+set_io PORTC7     18

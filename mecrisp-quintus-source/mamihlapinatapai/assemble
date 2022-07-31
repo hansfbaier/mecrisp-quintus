@@ -1,0 +1,11 @@
+#!/bin/sh
+
+arm-none-eabi-as mamihlapinatapai.s -o mamihlapinatapai.o
+arm-none-eabi-ld -o mamihlapinatapai.elf -T memmap mamihlapinatapai.o
+arm-none-eabi-objdump -D mamihlapinatapai.elf > mamihlapinatapai.list
+arm-none-eabi-objcopy mamihlapinatapai.elf mamihlapinatapai.bin -O binary
+
+arm-none-eabi-as mamihlapinatapai-m0.s -o mamihlapinatapai-m0.o
+arm-none-eabi-ld -o mamihlapinatapai-m0.elf -T memmap mamihlapinatapai-m0.o
+arm-none-eabi-objdump -D mamihlapinatapai-m0.elf > mamihlapinatapai-m0.list
+arm-none-eabi-objcopy mamihlapinatapai-m0.elf mamihlapinatapai-m0.bin -O binary

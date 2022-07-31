@@ -1,0 +1,4 @@
+The Hifive1B has a SEGGER JLink chip that handles writing to flash.
+You will need the JLINK client program from www.segger.com, and then:
+
+echo -e "loadfile $1\nexit\n" | $JLINK -device FE310 -if JTAG -speed 4000 -si JTAG -jtagconf -1,-1 -autoconnect 1

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+mipsel-linux-gnu-as -o mecrisp-quintus-pic32mx570f512l.o mecrisp-quintus-pic32mx570f512l.s -march=m4k
+mipsel-linux-gnu-ld -T memmap -o mecrisp-quintus-pic32mx570f512l.elf mecrisp-quintus-pic32mx570f512l.o
+
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx570f512l.elf mecrisp-quintus-pic32mx570f512l.hex -O ihex
+
+# mipsel-linux-gnu-objdump -Mgpr-names=32,cp0-names=mips32,cp0-names=mips32,hwr-names=mips32,reg-names=numeric -D mecrisp-quintus-pic32mx570f512l.elf > mecrisp-quintus-pic32mx570f512l.list
+# mipsel-linux-gnu-objdump -h mecrisp-quintus-pic32mx570f512l.elf > mecrisp-quintus-pic32mx570f512l.map
+
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx570f512l.elf mecrisp-quintus-pic32mx570f512l-boot.bin --only-section .boot -O binary
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx570f512l.elf mecrisp-quintus-pic32mx570f512l-text.bin --only-section .text -O binary
+

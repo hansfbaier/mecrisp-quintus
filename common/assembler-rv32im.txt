@@ -1,0 +1,437 @@
+
+\ Assembler for RV32IM, Copyright (C) 2019  Matthias Koch
+\ This is free software under GNU General Public License v3.
+
+\ Resolves constants, symbols and variable names and
+\ gives you a comfortable way to write machine instructions.
+
+\ In order to prevent a lot of name collisions,
+\  all assembler opcodes start with _
+
+\ -----------------------------------------------------------------------------
+\ A note on register usage in Mecrisp-Quintus for RISC-V
+\ -----------------------------------------------------------------------------
+
+\  x0  : Contains zero. Hardwired in silicon.
+\  x1  : "Link register", holds link back and is also used to compose long calls with auipc and jalr
+\  x2  : SP Stack pointer for return stack.
+\  x3  : Loop index
+\  x4  : Loop limit
+\  x5  : Scratch register, needs to be saved.
+\  x6  : Scratch register, needs to be saved.
+\  x7  : Scratch register, needs to be saved.
+\  x8  : TOS Top of data stack.
+\  x9  : PSP Data stack pointer.
+\  x10 : Scratch register, needs to be saved.
+\  x11 : Scratch register, needs to be saved.
+\  x12 : Scratch register, needs to be saved.
+\  x13 : Scratch register, needs to be saved.
+\  x14 : Free scratch register, not saved across calls.
+\  x15 : Free scratch register, not saved across calls.
+\
+\  x16 to x31 : Unused in vanilla cores.
+\
+\  Besides x0=zero, nothing is enforced by hardware on this architecture.
+\
+\  Acrobatics compiler is using x16 to x25 are free scratch registers, not saved across calls.
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for strings - Ein paar Stringhelferlein
+\ -----------------------------------------------------------------------------
+
+: vorneabschneiden ( Adresse Länge -- Adresse* Länge* ) \ Remove first character
+  1- swap 1+ swap
+;
+
+: ersteszeichen ( Adresse Länge -- Adresse* Länge* Zeichen ) \ Get first character
+  over c@
+;
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for parsing
+\ -----------------------------------------------------------------------------
+
+\ Muss jetzt noch angegebene Konstanten, Variablen, Wörter und Werte abhandeln.
+\ Das passiert dadurch, dass ich das Ding
+\ - im Dictionary suche
+\     - Falls Variable  --> Variablenadresse
+\     - Falls Puffer    --> Pufferadresse
+\     - Falls Konstante --> Konstante holen
+\ - Versuche in eine Zahl umzuwandeln
+
+\ Konstanten im Flash und Variablen im RAM haben Flag $40, Feste Variablen im Flash haben Flag $81, selbstdefinierte Einfachvariablen $C1 oder Doppeltvariablen $C2.
+
+: symbolparser ( Stringadresse Länge -- value-of-symbol )
+  ( token )
+
+  2dup find ( Adresse Flags ) over 0<>
+        if
+          \ Probe, ob die Flags auf Variablen oder Konstanten hindeuten
+          ( Adresse Flags )
+          $80000000 bic \ Remove visible Flag on some targets
+          swap
+          ( Flags Adresse )
+          over  $40 = if execute then \ Konstanten im RAM und Flash; Variablen im RAM
+          over  $81 = if execute then \ Selbstdefinierte Variablen        im Flash
+          over  $82 = if execute then \ Selbstdefinierte Doppeltvariablen im Flash
+          over $100 = if execute then \ Buffer:
+          nip ( Adresse oder geholte Konstante )
+
+          nip nip exit \ Vergiss Stringadresse, Rücksprung
+        else
+          2drop
+        then
+
+  2dup number 1 = if nip nip exit then \ Vergiss Stringadresse, Rücksprung
+
+  ." Invalid Symbol: " type cr quit
+;
+
+: numberparser ( Stringadresse Länge -- Zahl )
+  2dup 2>r number 1 <> if ." Invalid Value: " 2r> type cr quit else 2rdrop then
+;
+
+: registerparser ( Stringadresse Länge -- Registernummer )
+  ersteszeichen [char] x = if base @ >r decimal
+                             vorneabschneiden
+                             numberparser
+                             dup $1F bic if ." Invalid Register" cr quit then
+                             r> base !
+                           exit
+                           then
+
+  2dup s" zero" compare if 2drop 0 exit then
+
+  ." Invalid Operand" type cr quit
+;
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for immediates in opcodes
+\ -----------------------------------------------------------------------------
+
+: rangeerror ( ... -- ) ." Immediate constant too large" cr quit ;
+
+: 12bitrange? ( n -- ? ) $FFF80000 and dup $FFF80000 = swap 0= or ;
+: 12bitrangecheck ( n -- n ) dup 12bitrange? not if rangeerror then ;
+
+: >imm_i ( n -- x ) 12bitrangecheck 20 lshift ;
+
+: >imm_s ( n -- x ) 12bitrangecheck dup 20 lshift $FE000000 and
+                                    swap $1F and 7 lshift or ;
+
+: >imm_sb ( n -- x ) sb-encoding? not if rangeerror then ;
+: >imm_uj ( n -- x ) uj-encoding? not if rangeerror then ;
+: >imm_u  ( n -- x ) dup $FFF and     if rangeerror then ;
+
+\ -----------------------------------------------------------------------------
+\ Jumps and Labels
+\ -----------------------------------------------------------------------------
+
+0 variable label-
+0 variable label--
+0 variable label---
+
+: l-:   label-- @ label--- !
+        label-  @ label--  !
+        here      label-   !
+immediate ;
+
+\ Forward labels
+\ Idea: Remember place and jump-opcodes to be filled in when label is reached.
+
+0. 2variable label-f1
+0. 2variable label-f2
+0. 2variable label-f3
+0. 2variable label-f4
+0. 2variable label-f5
+0. 2variable label-f6
+0. 2variable label-f7
+0. 2variable label-f8
+
+: check+label ( Sprungkonstruktadresse -- )
+  dup @ 28 rshift ( Addr Labelzähler )
+    dup if \ Ungleich 0 ( Addr Labelzähler )
+
+          1 = if ( Adresse )
+
+                dup 2@ ( Adresse Lückenadresse Labelopcode )
+
+                $10000000 - \ Label 1 auf 0 setzen, damit Opcode stimmt !
+                ( Adresse Lückenadresse Opcode-Bitmaske )
+                here swap
+                ( Adresse Lückenadresse Zieladresse Opcode-Bitmaske )
+
+                >r
+                over - ( Adresse   Lückenadresse Distanz R: Opcode-Bitmaske )
+
+                r@ $0000006F = if >imm_uj else >imm_sb then
+
+                r> or          ( Adresse   Lückenadresse Opcode )
+                swap dup addrinflash? if flash! else ! then
+
+                ( Adresse )
+                >r 0. r> 2!  \ Sprunglabel aus Tabelle löschen
+
+              else
+
+                dup ( Adresse Adresse )
+                @   ( Adresse Labelopcode )
+                $10000000 -  ( Adresse Labelopcode* )
+                swap ( Labelopcode* Adresse )
+                !
+              then
+
+        else \ Null - nichts tun
+          ( Addr Labelzähler )
+          2drop
+        then
+;
+
+: l+:
+  \ Time to fill in opcodes for forward jumps.
+  \ Crawl the notes to see what is pending.
+  label-f1 check+label
+  label-f2 check+label
+  label-f3 check+label
+  label-f4 check+label
+  label-f5 check+label
+  label-f6 check+label
+  label-f7 check+label
+  label-f8 check+label
+immediate ;
+
+: remember+jump ( Zieladresse Opcode )
+  \ Find an empty location in the forward-jump-notes.
+  \ If it contains zero, the fresh wish for a jump can be filled in.
+  label-f1 @ 0= if label-f1 2!  exit then
+  label-f2 @ 0= if label-f2 2!  exit then
+  label-f3 @ 0= if label-f3 2!  exit then
+  label-f4 @ 0= if label-f4 2!  exit then
+  label-f5 @ 0= if label-f5 2!  exit then
+  label-f6 @ 0= if label-f6 2!  exit then
+  label-f7 @ 0= if label-f7 2!  exit then
+  label-f8 @ 0= if label-f8 2!  exit then
+  ." Too many forward references" cr quit
+;
+
+: jump-destination ( Opcode Stringaddress Length -- Opcode Flag )
+    2dup s" +"   compare if 2drop $10000000 or false exit then  \ False: Has to be resolved later
+    2dup s" ++"  compare if 2drop $20000000 or false exit then
+    2dup s" +++" compare if 2drop $30000000 or false exit then
+
+    2dup s" -"   compare if 2drop label-   @  here - true exit then \ True: Insert now
+    2dup s" --"  compare if 2drop label--  @  here - true exit then
+    2dup s" ---" compare if 2drop label--- @  here - true exit then
+
+    \ Choose one:
+
+    numberparser \ For specifying jump offsets directly when not using labels
+
+    \ symbolparser here - \ If you want to reach other definitions with jump opcodes
+    \                      \ *** Caution: Inconsistent results depending on type of destination !
+
+    true
+;
+
+: jumps <builds , $30 setflags
+        does> @ ( Opcode )
+              dup $0000006F <>
+              if
+                token registerparser 15 lshift or
+                token registerparser 20 lshift or
+              then
+
+              token jump-destination
+              if   \ Backward Jump
+                over $0000006F = if >imm_uj else >imm_sb then or ,
+              else \ Forward-Jump
+                here swap remember+jump 4 allot
+              then
+;
+
+\ Conditional branches and unconditional jump:
+
+$63  0 12 lshift or jumps _beq
+$63  1 12 lshift or jumps _bne
+$63  4 12 lshift or jumps _blt
+$63  5 12 lshift or jumps _bge
+$63  6 12 lshift or jumps _bltu
+$63  7 12 lshift or jumps _bgeu
+$6F                 jumps _j     ( jal zero, ... )
+
+\ -----------------------------------------------------------------------------
+\ Simple instructions without operands
+\ -----------------------------------------------------------------------------
+
+: zero-operand <builds , $30 setflags
+                 does> @ , ;
+
+$10500073 zero-operand _wfi
+
+\ -----------------------------------------------------------------------------
+\ Instructions with three register operands
+\ -----------------------------------------------------------------------------
+
+: triple-operand <builds , $30 setflags
+                 does> @ ( Opcode )
+                       token registerparser  7 lshift or
+                       token registerparser 15 lshift or
+                       token registerparser 20 lshift or
+                       ,
+;
+
+$33  0 12 lshift or   1 25 lshift or  triple-operand  _mul
+$33  1 12 lshift or   1 25 lshift or  triple-operand  _mulh
+$33  2 12 lshift or   1 25 lshift or  triple-operand  _mulhsu
+$33  3 12 lshift or   1 25 lshift or  triple-operand  _mulhu
+$33  4 12 lshift or   1 25 lshift or  triple-operand  _div
+$33  5 12 lshift or   1 25 lshift or  triple-operand  _divu
+$33  6 12 lshift or   1 25 lshift or  triple-operand  _rem
+$33  7 12 lshift or   1 25 lshift or  triple-operand  _remu
+
+$33  0 12 lshift or                   triple-operand  _add
+$33  0 12 lshift or  32 25 lshift or  triple-operand  _sub
+$33  1 12 lshift or                   triple-operand  _sll
+$33  2 12 lshift or                   triple-operand  _slt
+$33  3 12 lshift or                   triple-operand  _sltu
+$33  4 12 lshift or                   triple-operand  _xor
+$33  5 12 lshift or                   triple-operand  _srl
+$33  5 12 lshift or  32 25 lshift or  triple-operand  _sra
+$33  6 12 lshift or                   triple-operand  _or
+$33  7 12 lshift or                   triple-operand  _and
+
+\ -----------------------------------------------------------------------------
+\ Instructions with 12 bit immediate operands
+\ -----------------------------------------------------------------------------
+
+: immediate-operand <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser  7 lshift or
+                          token registerparser 15 lshift or
+                          token symbolparser >imm_i or
+                          ,
+;
+
+
+$13  0 12 lshift or                   immediate-operand  _addi
+$13  1 12 lshift or                   immediate-operand  _slli
+$13  2 12 lshift or                   immediate-operand  _slti
+$13  3 12 lshift or                   immediate-operand  _sltiu
+$13  4 12 lshift or                   immediate-operand  _xori
+$13  5 12 lshift or                   immediate-operand  _srli
+$13  5 12 lshift or  32 25 lshift or  immediate-operand  _srai
+$13  6 12 lshift or                   immediate-operand  _ori
+$13  7 12 lshift or                   immediate-operand  _andi
+
+\ -----------------------------------------------------------------------------
+\ Instructions for load and store
+\ -----------------------------------------------------------------------------
+
+: load-opcodes      <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser  7 lshift or
+                          token registerparser 15 lshift or
+                          token numberparser >imm_i or
+                          ,
+;
+
+$03  0 12 lshift or load-opcodes _lb
+$03  1 12 lshift or load-opcodes _lh
+$03  2 12 lshift or load-opcodes _lw
+$03  4 12 lshift or load-opcodes _lbu
+$03  5 12 lshift or load-opcodes _lhu
+
+
+: store-opcodes     <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser 20 lshift or
+                          token registerparser 15 lshift or
+                          token numberparser >imm_s or
+                          ,
+;
+
+$23  0 12 lshift or store-opcodes _sb
+$23  1 12 lshift or store-opcodes _sh
+$23  2 12 lshift or store-opcodes _sw
+
+\ -----------------------------------------------------------------------------
+\ Instructions with long immediates
+\ -----------------------------------------------------------------------------
+
+: _lui ( -- )
+  $37
+  token registerparser 7 lshift or
+  token numberparser >imm_u or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _auipc ( -- )
+  $17
+  token registerparser 7 lshift or
+  token numberparser >imm_u or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+\ -----------------------------------------------------------------------------
+\ Instructions with jumps
+\ -----------------------------------------------------------------------------
+
+: _jal ( -- )
+  $6F
+  token registerparser 7 lshift or
+  token numberparser >imm_uj or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+
+: _jalr ( -- )
+  $67
+  token registerparser  7 lshift or
+  token registerparser 15 lshift or
+  token numberparser >imm_i or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+
+\ -----------------------------------------------------------------------------
+\ Instructions which are emulated and/or macros
+\ -----------------------------------------------------------------------------
+
+: _mv ( -- )
+  $00000013 \ addi zero, zero, 0
+  token registerparser  7 lshift or
+  token registerparser 15 lshift or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _li ( -- )
+  token registerparser
+  token symbolparser
+  swap
+  registerliteral,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _call ( -- )
+  token symbolparser call,
+immediate inline ; \ This combination gives immediate-compileonly
+
+$00008067 zero-operand _ret \ jalr zero, 0(x1)
+
+: _push ( -- )
+
+  token registerparser 20 lshift
+
+  $FFC10113 ,    \ addi   x2, x2, -4
+  $00012023 or , \ sw zero, 0(x2)
+
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _pop ( -- )
+
+  token registerparser 7 lshift
+
+  $00012003 or , \ lw zero, 0(x2)
+  $00410113 ,    \ addi   x2, x2, 4
+
+immediate inline ; \ This combination gives immediate-compileonly
+

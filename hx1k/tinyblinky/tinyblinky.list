@@ -1,0 +1,41 @@
+
+tinyblinky.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <Reset-0x2c>:
+   0:	00810437          	lui	x8,0x810
+   4:	00000493          	li	x9,0
+   8:	10000513          	li	x10,256
+   c:	00042583          	lw	x11,0(x8) # 810000 <breathe_led+0x80ffc4>
+  10:	00b4a023          	sw	x11,0(x9)
+  14:	00440413          	addi	x8,x8,4
+  18:	00448493          	addi	x9,x9,4
+  1c:	ffc50513          	addi	x10,x10,-4
+  20:	fe0516e3          	bnez	x10,c <Reset-0x20>
+  24:	00000437          	lui	x8,0x0
+  28:	02c40067          	jr	44(x8) # 2c <Reset>
+
+0000002c <Reset>:
+  2c:	00400437          	lui	x8,0x400
+  30:	00440413          	addi	x8,x8,4 # 400004 <breathe_led+0x3fffc8>
+  34:	00100513          	li	x10,1
+  38:	01351593          	slli	x11,x10,0x13
+
+0000003c <breathe_led>:
+  3c:	41155613          	srai	x12,x10,0x11
+  40:	40c585b3          	sub	x11,x11,x12
+  44:	4115d613          	srai	x12,x11,0x11
+  48:	00c50533          	add	x10,x10,x12
+  4c:	40d5d613          	srai	x12,x11,0xd
+  50:	0a760613          	addi	x12,x12,167
+  54:	00767693          	andi	x13,x12,7
+  58:	00868693          	addi	x13,x13,8
+  5c:	00365613          	srli	x12,x12,0x3
+  60:	00c696b3          	sll	x13,x13,x12
+  64:	00d484b3          	add	x9,x9,x13
+  68:	00d4b6b3          	sltu	x13,x9,x13
+  6c:	40d006b3          	neg	x13,x13
+  70:	00d42023          	sw	x13,0(x8)
+  74:	fc9ff06f          	j	3c <breathe_led>

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+rm -f build/*
+
+echo "Synthesize design..."
+yosys  -q -p "synth_ice40 -top breakout -json build/hx8k-breakout.json -blif build/hx8k-breakout.blif -abc2" hx8k-breakout.v uart-fifo.v spimemio.v picosoc.v picorv32.v
+
+echo "Place and Route..."
+nextpnr-ice40 --freq 36 --hx8k --package ct256 --asc build/hx8k-breakout.txt --pcf hx8k-breakout.pcf --json build/hx8k-breakout.json --ignore-loops --pcf-allow-unconstrained
+
+echo "Create Bitstream..."
+icepack build/hx8k-breakout.txt build/hx8k-breakout0.bin
+icemulti -p0 build/hx8k-breakout0.bin > hx8k-breakout.bin
+
+echo "Finished."

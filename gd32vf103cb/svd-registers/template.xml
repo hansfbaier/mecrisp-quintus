@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--GD32VF103 svdcutter template.xml creator for Mecrisp-Stellaris Forth by Matthias Koch -->
+<!--By Terry Porter "terry@tjporter.com.au"-->
+<!--COMMENT-OUT UNWANTED REGISTERS LIKE THIS-->
+
+<peripherals>
+  <name>ADC0</name>
+  <name>ADC1</name>
+  <name>AFIO</name>
+  <name>BKP</name>
+  <name>CAN0</name>
+  <name>CAN1</name>
+  <name>CRC</name>
+  <name>DAC</name>
+  <name>DBG</name>
+  <name>DMA0</name>
+  <name>DMA1</name>
+  <name>EXMC</name>
+  <name>EXTI</name>
+  <name>FMC</name>
+  <name>FWDGT</name>
+  <name>GPIOA</name>
+  <name>GPIOB</name>
+  <name>GPIOC</name>
+  <name>GPIOD</name>
+  <name>GPIOE</name>
+  <name>I2C0</name>
+  <name>I2C1</name>
+  <name>ECLIC</name>
+  <name>PMU</name>
+  <name>RCU</name>
+  <name>RTC</name>
+  <name>SPI0</name>
+  <name>SPI1</name>
+  <name>SPI2</name>
+  <name>TIMER0</name>
+  <name>TIMER1</name>
+  <name>TIMER2</name>
+  <name>TIMER3</name>
+  <name>TIMER4</name>
+  <name>TIMER5</name>
+  <name>TIMER6</name>
+  <name>USART0</name>
+  <name>USART1</name>
+  <name>USART2</name>
+  <name>UART3</name>
+  <name>UART4</name>
+  <name>USBFS_GLOBAL</name>
+  <name>USBFS_HOST</name>
+  <name>USBFS_DEVICE</name>
+  <name>USBFS_PWRCLK</name>
+  <name>WWDGT</name>
+</peripherals>  
+

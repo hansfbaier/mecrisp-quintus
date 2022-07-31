@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hx8k" ]]
+then
+cd mecrisp-quintus-source/hx8k
+make clean all
+cp *.bin ../../hx8k
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "icebreaker" ]]
+then
+cd mecrisp-quintus-source/icebreaker
+make clean all
+cp *.bin ../../icebreaker
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "icebreaker-femtorv32" ]]
+then
+cd mecrisp-quintus-source/icebreaker-femtorv32
+make clean all
+cp *.bin ../../icebreaker-femtorv32
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "lm4f120" ]]
+then
+cd mecrisp-quintus-source/mamihlapinatapai
+./assemble
+cd ../lm4f120
+make clean all
+cp *.bin ../../lm4f120
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "tm4c1294" ]]
+then
+cd mecrisp-quintus-source/tm4c1294
+make clean all
+cp *.bin ../../tm4c1294
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "gd32vf103cb" ]]
+then
+
+cd mecrisp-quintus-source/gd32vf103cb
+make clean all
+cp *.bin ../../gd32vf103cb
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hifive1B" ]]
+then
+cd mecrisp-quintus-source/hifive1B
+make clean all
+cp *.bin *.hex ../../hifive1B
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hifive1A" ]]
+then
+cd mecrisp-quintus-source/hifive1A
+make clean all
+cp *.bin *.hex ../../hifive1A
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-mips" ]]
+then
+cd mecrisp-quintus-source/linux-mips
+./assemble
+mv mecrisp-quintus-linux-mips ../../linux-mips
+rm *.o *.list
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-rv32im" ]]
+then
+cd mecrisp-quintus-source/linux-rv32im
+./assemble
+mv mecrisp-quintus-linux-rv32im ../../linux-rv32im
+rm *.o *.list
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-rv32imc" ]]
+then
+cd mecrisp-quintus-source/linux-rv32imc
+./assemble
+mv mecrisp-quintus-linux-rv32imc ../../linux-rv32imc
+rm *.o *.list
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "pic32mx5" ]]
+then
+cd mecrisp-quintus-source/pic32mx570f512l
+./assemble
+mv *.hex ../../pic32mx570f512l
+mv *.bin ../../pic32mx570f512l
+rm *.o
+rm *.elf
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "pic32mx2" ]]
+then
+cd mecrisp-quintus-source/pic32mx270f256b
+./assemble
+mv *.hex ../../pic32mx270f256b
+mv *.bin ../../pic32mx270f256b
+rm *.o
+rm *.elf
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "vega" ]]
+then
+cd mecrisp-quintus-source/vega
+make clean all
+cp *.bin ../../vega
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "ulx3s" ]]
+then
+cd mecrisp-quintus-source/ulx3s
+make clean all
+cp *.bin ../../ulx3s
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------

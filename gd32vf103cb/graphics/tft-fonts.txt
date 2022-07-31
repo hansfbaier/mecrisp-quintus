@@ -1,0 +1,258 @@
+\ tft-fonts.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+\ In this implementation there are three fonts that resides in
+\ a file called mecrisp-fonts.txt. These are the two fonts I found
+\ in Matthias's graphics-unicode-8x16.txt and
+\ graphics-unicode-8x8.txt and a third one I convertet from
+\ Lat15-Terminus32x16.PSF. 
+\ There is also a gforth source file called PSF.fs. With that
+\ and gforth I did the convertion. If you can use it too you will
+\ have access to all PSF2 you can find under Linux at
+\ /usr/share/consolefonts/ 
+\ Fonts use much of space. As there is much more space in flash
+\ memory than in ram I load all the fonts into flash. There they
+\ will live for 'ever' i.e. until you reflash or destroy in
+\ someway your nano flash.
+\ That also means: Load this file only once!
+\ In the near? future the fonts will reside on a sd-card.  
+
+\ mecrisp-fonts.txt defines the variables: font ( startaddress
+\ of font in flash), font-width, font-height
+\ and the words: glyphsize (ammount of bytes of a glyph) ,
+\ small-font (sets font, font-width and font-height for a 8x8 font)
+\ big-font (sets font, font-width and font-height for a 8x16 font)
+\ giant-font (sets font, font-width and font-height for a 16x32 font)
+
+    
+: find-char ( n -- addr )      \ n = unicode entry point
+    font @                     \ char addr
+    BEGIN dup h@ dup 0<> swap  \ char addr flag char'
+        3 pick <> and          \ char addr flag 
+    WHILE glyphsize +          \ char addr 
+    REPEAT
+    nip 2 +
+    1-foldable
+;
+    
+: index-char ( n -- addr )     \ index in fonttab
+  glyphsize *
+  font @ + 2+
+;
+
+0 Variable (char-fg-col)
+0 Variable (char-bg-col)
+
+
+\ char-fg-col! sets color of char
+: char-fg-col! ( -- )
+    color @ (char-fg-col) !
+;
+
+\ char-bg-col! sets background color of charbox
+: char-bg-col! ( -- )
+    color @ (char-bg-col) !
+;
+
+\  char-fg-col activates char color
+: char-fg-col ( -- )
+    (char-fg-col) @ color !
+;
+
+\ char-bg-col activates background color
+: char-bg-col ( -- )
+    (char-bg-col) @ color !
+;
+
+\ char-pixels prints out n pixels of charbyte 
+: char-pixels ( n n -- )
+   0 ?DO
+   dup %10000000 and  \ get MSB
+   IF   char-fg-col   \ ( [char] x emit )
+   ELSE char-bg-col   \ ( space \ [char] . emit )
+   THEN
+   color @ 2bytes>tft \ draw one pixel
+   2*                 \ rshift
+   LOOP drop
+;
+
+\ char-row prints out a scanline of char
+: char-row ( addr -- addr' )
+   font-width @ 8 /mod -rot swap rot
+   0 DO count 8 char-pixels LOOP
+   swap dup IF swap count rot char-pixels
+            ELSE drop
+            THEN
+;
+
+: char-box ( x y -- ) \  prepare the box for a char 
+    2dup 
+    font-height @ 1- + swap font-width @ 1- + swap
+    set-shape
+    write-memory
+;
+
+: pour-char ( addr -- ) \ pour char into prepared box 
+    font-height @ 0
+    DO
+        char-row
+    LOOP
+    drop
+;
+
+: place-char ( x y n -- ) \ n = index
+  -rot
+  char-box
+  find-char
+  pour-char
+;
+
+\ ----------------------------------------------------
+\ ------ Now let's do some terminal similar words! ---
+\ ----------------------------------------------------
+
+0 Variable char-x
+0 Variable char-y
+
+: tft-cols ( -- n )
+    tft-width @ font-width @ / ;
+
+: tft-rows ( -- n )
+    tft-height @ font-height @ / ;
+
+: tft-at ( row col -- )
+    font-width @ * char-x !
+    font-height @ * char-y !
+;
+
+: tft-at? ( -- row col )
+    char-y @ font-height @ /
+    char-x @ font-width @ /
+;
+
+: tft-cr ( -- )
+    0 char-x !
+    font-height @ char-y +!
+;
+
+\ tft-cr? sets new positon; if end of line is
+\ reached makes cr
+: tft-cr? ( -- )
+    char-x @ font-width @ +
+    tft-width @ >
+    IF 0 char-x !
+        font-height @ char-y +!
+    ELSE
+        font-width @ char-x +!
+    THEN
+;
+
+
+: tft-page ( -- )
+    white tft-clear
+    0 char-x !
+    0 char-y !
+;
+
+: tft-emit ( n -- )
+dup 13 =
+IF drop \ tft-cr
+ELSE
+    char-x @ char-y @
+    rot place-char
+    tft-cr?
+then ;
+        
+
+: tft-type ( addr n -- )
+    0 ?DO count tft-emit LOOP drop ;
+
+
+
+\ -------------------------------------------------------------
+\ The handling of UTF-8 chars is taken from Matthias's
+\ graphic-unicode-8xxx.txt.
+\ In the word 'drawcharacter' I replaced 'drawunicode' with
+\ tft-emit renamed drawstring to utf-type and adapted its
+\ behavior to my needs (i.e. use tft-at, tft-at?).
+\ Beaware that a single UTF-8 character that is not in the
+\ ASCII range 0 - 127 is realised as a group of pseudochars and
+\ therfore must be handled as a string. So you can't emit
+\ a single UTF-8 char with a code higher than 127. Use utf-type
+\ for that.
+\ Rule: utf-type>tft-type
+\ -------------------------------------------------------------
+
+
+\ -------------------------------------------------------------
+\  Unicode UTF-8 encoding decoder
+\ -------------------------------------------------------------
+
+0 variable utf8collection
+0 variable utf8continuation
+
+: utf8-character-length ( c -- c u )
+  dup %11000000 and %11000000 = if dup 24 lshift not clz else 1 then ;
+
+: drawcharacter ( c -- ) \ Handles a stream of UTF-8 bytes and translates this into Unicode letters.
+
+  utf8continuation @
+  if   \ Continue to receive an extended character into buffer
+
+    %00111111 and utf8collection @ 6 lshift or utf8collection !  \ Six more bits
+    -1 utf8continuation +!                                       \ One less continuation byte to expect
+    utf8continuation @ 0= if utf8collection @ tft-emit then   \ Draw character if complete encoding was buffered.
+
+  else \ Begin of a new character
+
+    utf8-character-length 1- ?dup
+
+    if \ Start of a new character or a sequence
+      dup utf8continuation !
+      25 + tuck lshift swap rshift \ Remove the length encoding by shifting it out of the register temporarily
+      utf8collection !
+    else \ One byte characters are classic 7 bit ASCII and can be drawn immediately
+      tft-emit
+    then
+
+  then
+;
+
+\ -------------------------------------------------------------
+\  Write a string and split into individual characters
+\ -------------------------------------------------------------
+
+: get-first-char ( addr len -- addr   len c ) over c@ ;
+: cut-first-char ( addr len -- addr+1 len-1 ) 1- swap 1+ swap ;
+
+: utf-type ( addr u -- )
+  begin
+    dup 0<>
+  while
+    get-first-char
+    drawcharacter
+    cut-first-char
+  repeat
+  2drop
+;
+
+\ -------------------------------------------------------------
+\  A small demo
+\ -------------------------------------------------------------
+
+: font-demo ( -- )
+    tft-page
+    white char-fg-col!
+    blue char-bg-col!
+    small-font
+    s" Three fonts in one  Display!" tft-type
+    maroon char-bg-col!
+    big-font 1 0 tft-at
+    s" German: ÄÖÜäüöß" utf-type
+    green char-bg-col!
+    giant-font tft-cr
+    s" Mecrisp" tft-type 
+;

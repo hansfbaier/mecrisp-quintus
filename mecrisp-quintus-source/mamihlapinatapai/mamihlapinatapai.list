@@ -1,0 +1,403 @@
+
+mamihlapinatapai.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <mamihlapinatapai>:
+   0:	a1ff      	add	r1, pc, #1020	; (adr r1, 400 <riscvboot>)
+   2:	4668      	mov	r0, sp
+   4:	2200      	movs	r2, #0
+   6:	2300      	movs	r3, #0
+   8:	5083      	str	r3, [r0, r2]
+   a:	3204      	adds	r2, #4
+   c:	2a80      	cmp	r2, #128	; 0x80
+   e:	d1fb      	bne.n	8 <mamihlapinatapai+0x8>
+  10:	e005      	b.n	1e <mamihlapinatapai_execute>
+
+00000012 <write_rd_finish>:
+  12:	0954      	lsrs	r4, r2, #5
+  14:	f014 047c 	ands.w	r4, r4, #124	; 0x7c
+  18:	bf18      	it	ne
+  1a:	5107      	strne	r7, [r0, r4]
+
+0000001c <continue>:
+  1c:	3104      	adds	r1, #4
+
+0000001e <mamihlapinatapai_execute>:
+  1e:	680a      	ldr	r2, [r1, #0]
+  20:	f012 037f 	ands.w	r3, r2, #127	; 0x7f
+  24:	089b      	lsrs	r3, r3, #2
+  26:	e8df f003 	tbb	[pc, r3]
+
+0000002a <execute_table>:
+  2a:	f9f9f910 			; <UNDEFINED> instruction: 0xf9f9f910
+  2e:	f9f9449e 			; <UNDEFINED> instruction: 0xf9f9449e
+  32:	f9f9f929 			; <UNDEFINED> instruction: 0xf9f9f929
+  36:	f9f948cc 			; <UNDEFINED> instruction: 0xf9f948cc
+  3a:	f9f9f9f9 			; <UNDEFINED> instruction: 0xf9f9f9f9
+  3e:	f9f9f9f9 			; <UNDEFINED> instruction: 0xf9f9f9f9
+  42:	5bf94b71 	blpl	ffe52e0e <riscvboot+0xffe52a0e>
+  46:	f9f9f9f9 			; <UNDEFINED> instruction: 0xf9f9f9f9
+
+0000004a <execute_load>:
+  4a:	0453      	lsls	r3, r2, #17
+  4c:	0f5b      	lsrs	r3, r3, #29
+  4e:	0b55      	lsrs	r5, r2, #13
+  50:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+  54:	5945      	ldr	r5, [r0, r5]
+  56:	1517      	asrs	r7, r2, #20
+  58:	e8df f003 	tbb	[pc, r3]
+
+0000005c <load_table>:
+  5c:	0f0a0704 	svceq	0x000a0704
+  60:	0f0f0e0c 	svceq	0x000f0e0c
+
+00000064 <load_0>:
+  64:	5def      	ldrb	r7, [r5, r7]
+  66:	b27f      	sxtb	r7, r7
+  68:	e7d3      	b.n	12 <write_rd_finish>
+
+0000006a <load_1>:
+  6a:	5bef      	ldrh	r7, [r5, r7]
+  6c:	b23f      	sxth	r7, r7
+  6e:	e7d0      	b.n	12 <write_rd_finish>
+
+00000070 <load_2>:
+  70:	59ef      	ldr	r7, [r5, r7]
+  72:	e7ce      	b.n	12 <write_rd_finish>
+
+00000074 <load_4>:
+  74:	5def      	ldrb	r7, [r5, r7]
+  76:	e7cc      	b.n	12 <write_rd_finish>
+
+00000078 <load_5>:
+  78:	5bef      	ldrh	r7, [r5, r7]
+
+0000007a <load_finished>:
+  7a:	e7ca      	b.n	12 <write_rd_finish>
+
+0000007c <execute_store>:
+  7c:	0453      	lsls	r3, r2, #17
+  7e:	0f5b      	lsrs	r3, r3, #29
+  80:	0b55      	lsrs	r5, r2, #13
+  82:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+  86:	5945      	ldr	r5, [r0, r5]
+  88:	0c96      	lsrs	r6, r2, #18
+  8a:	f016 067c 	ands.w	r6, r6, #124	; 0x7c
+  8e:	5986      	ldr	r6, [r0, r6]
+  90:	0517      	lsls	r7, r2, #20
+  92:	0eff      	lsrs	r7, r7, #27
+  94:	1654      	asrs	r4, r2, #25
+  96:	0164      	lsls	r4, r4, #5
+  98:	4327      	orrs	r7, r4
+  9a:	e8df f003 	tbb	[pc, r3]
+
+0000009e <store_table>:
+  9e:	09080604 	stmdbeq	r8, {r2, r9, sl}
+  a2:	09090909 	stmdbeq	r9, {r0, r3, r8, fp}
+
+000000a6 <store_0>:
+  a6:	55ee      	strb	r6, [r5, r7]
+  a8:	e7b8      	b.n	1c <continue>
+
+000000aa <store_1>:
+  aa:	53ee      	strh	r6, [r5, r7]
+  ac:	e7b6      	b.n	1c <continue>
+
+000000ae <store_2>:
+  ae:	51ee      	str	r6, [r5, r7]
+
+000000b0 <store_finished>:
+  b0:	e7b4      	b.n	1c <continue>
+
+000000b2 <execute_auipc>:
+  b2:	0b17      	lsrs	r7, r2, #12
+  b4:	033f      	lsls	r7, r7, #12
+  b6:	187f      	adds	r7, r7, r1
+  b8:	e7ab      	b.n	12 <write_rd_finish>
+
+000000ba <execute_lui>:
+  ba:	0b17      	lsrs	r7, r2, #12
+  bc:	033f      	lsls	r7, r7, #12
+  be:	e7a8      	b.n	12 <write_rd_finish>
+
+000000c0 <execute_jalr>:
+  c0:	000b      	movs	r3, r1
+  c2:	0b55      	lsrs	r5, r2, #13
+  c4:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+  c8:	5945      	ldr	r5, [r0, r5]
+  ca:	1517      	asrs	r7, r2, #20
+  cc:	19e9      	adds	r1, r5, r7
+  ce:	f031 0101 	bics.w	r1, r1, #1
+  d2:	1d1f      	adds	r7, r3, #4
+  d4:	0954      	lsrs	r4, r2, #5
+  d6:	f014 047c 	ands.w	r4, r4, #124	; 0x7c
+  da:	bf18      	it	ne
+  dc:	5107      	strne	r7, [r0, r4]
+  de:	e79e      	b.n	1e <mamihlapinatapai_execute>
+
+000000e0 <execute_jal>:
+  e0:	1d0f      	adds	r7, r1, #4
+  e2:	0954      	lsrs	r4, r2, #5
+  e4:	f014 047c 	ands.w	r4, r4, #124	; 0x7c
+  e8:	bf18      	it	ne
+  ea:	5107      	strne	r7, [r0, r4]
+  ec:	0057      	lsls	r7, r2, #1
+  ee:	0dbf      	lsrs	r7, r7, #22
+  f0:	007f      	lsls	r7, r7, #1
+  f2:	02d4      	lsls	r4, r2, #11
+  f4:	0fe4      	lsrs	r4, r4, #31
+  f6:	02e4      	lsls	r4, r4, #11
+  f8:	4327      	orrs	r7, r4
+  fa:	0314      	lsls	r4, r2, #12
+  fc:	0e24      	lsrs	r4, r4, #24
+  fe:	0324      	lsls	r4, r4, #12
+ 100:	4327      	orrs	r7, r4
+ 102:	17d4      	asrs	r4, r2, #31
+ 104:	0524      	lsls	r4, r4, #20
+ 106:	4327      	orrs	r7, r4
+ 108:	19c9      	adds	r1, r1, r7
+ 10a:	e788      	b.n	1e <mamihlapinatapai_execute>
+
+0000010c <execute_branch>:
+ 10c:	0453      	lsls	r3, r2, #17
+ 10e:	0f5b      	lsrs	r3, r3, #29
+ 110:	0b55      	lsrs	r5, r2, #13
+ 112:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+ 116:	5945      	ldr	r5, [r0, r5]
+ 118:	0c96      	lsrs	r6, r2, #18
+ 11a:	f016 067c 	ands.w	r6, r6, #124	; 0x7c
+ 11e:	5986      	ldr	r6, [r0, r6]
+ 120:	42b5      	cmp	r5, r6
+ 122:	e8df f003 	tbb	[pc, r3]
+
+00000126 <branch_table>:
+ 126:	0f0f0604 	svceq	0x000f0604
+ 12a:	0e0c0a08 	vmlaeq.f32	s0, s24, s16
+
+0000012e <branch_0>:
+ 12e:	d00a      	beq.n	146 <branch_take>
+ 130:	e774      	b.n	1c <continue>
+
+00000132 <branch_1>:
+ 132:	d108      	bne.n	146 <branch_take>
+ 134:	e772      	b.n	1c <continue>
+
+00000136 <branch_4>:
+ 136:	db06      	blt.n	146 <branch_take>
+ 138:	e770      	b.n	1c <continue>
+
+0000013a <branch_5>:
+ 13a:	da04      	bge.n	146 <branch_take>
+ 13c:	e76e      	b.n	1c <continue>
+
+0000013e <branch_6>:
+ 13e:	d302      	bcc.n	146 <branch_take>
+ 140:	e76c      	b.n	1c <continue>
+
+00000142 <branch_7>:
+ 142:	d200      	bcs.n	146 <branch_take>
+
+00000144 <branch_skip>:
+ 144:	e76a      	b.n	1c <continue>
+
+00000146 <branch_take>:
+ 146:	0517      	lsls	r7, r2, #20
+ 148:	0f3f      	lsrs	r7, r7, #28
+ 14a:	007f      	lsls	r7, r7, #1
+ 14c:	0054      	lsls	r4, r2, #1
+ 14e:	0ea4      	lsrs	r4, r4, #26
+ 150:	0164      	lsls	r4, r4, #5
+ 152:	4327      	orrs	r7, r4
+ 154:	0614      	lsls	r4, r2, #24
+ 156:	0fe4      	lsrs	r4, r4, #31
+ 158:	02e4      	lsls	r4, r4, #11
+ 15a:	4327      	orrs	r7, r4
+ 15c:	17d4      	asrs	r4, r2, #31
+ 15e:	0324      	lsls	r4, r4, #12
+ 160:	4327      	orrs	r7, r4
+ 162:	19c9      	adds	r1, r1, r7
+ 164:	e75b      	b.n	1e <mamihlapinatapai_execute>
+
+00000166 <execute_immediate>:
+ 166:	0453      	lsls	r3, r2, #17
+ 168:	0f5b      	lsrs	r3, r3, #29
+ 16a:	0b55      	lsrs	r5, r2, #13
+ 16c:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+ 170:	5945      	ldr	r5, [r0, r5]
+ 172:	1517      	asrs	r7, r2, #20
+ 174:	e8df f003 	tbb	[pc, r3]
+
+00000178 <immediate_table>:
+ 178:	100b0604 	andne	r0, fp, r4, lsl #12
+ 17c:	23211715 			; <UNDEFINED> instruction: 0x23211715
+
+00000180 <immediate_0>:
+ 180:	197f      	adds	r7, r7, r5
+ 182:	e746      	b.n	12 <write_rd_finish>
+
+00000184 <immediate_1>:
+ 184:	f017 071f 	ands.w	r7, r7, #31
+ 188:	fa15 f707 	lsls.w	r7, r5, r7
+ 18c:	e741      	b.n	12 <write_rd_finish>
+
+0000018e <immediate_2>:
+ 18e:	42bd      	cmp	r5, r7
+ 190:	bfb4      	ite	lt
+ 192:	2701      	movlt	r7, #1
+ 194:	2700      	movge	r7, #0
+ 196:	e73c      	b.n	12 <write_rd_finish>
+
+00000198 <immediate_3>:
+ 198:	42bd      	cmp	r5, r7
+ 19a:	bf34      	ite	cc
+ 19c:	2701      	movcc	r7, #1
+ 19e:	2700      	movcs	r7, #0
+ 1a0:	e737      	b.n	12 <write_rd_finish>
+
+000001a2 <immediate_4>:
+ 1a2:	406f      	eors	r7, r5
+ 1a4:	e735      	b.n	12 <write_rd_finish>
+
+000001a6 <immediate_5>:
+ 1a6:	f017 071f 	ands.w	r7, r7, #31
+ 1aa:	0e94      	lsrs	r4, r2, #26
+ 1ac:	2c10      	cmp	r4, #16
+ 1ae:	bf0c      	ite	eq
+ 1b0:	fa45 f707 	asreq.w	r7, r5, r7
+ 1b4:	fa25 f707 	lsrne.w	r7, r5, r7
+ 1b8:	e72b      	b.n	12 <write_rd_finish>
+
+000001ba <immediate_6>:
+ 1ba:	432f      	orrs	r7, r5
+ 1bc:	e729      	b.n	12 <write_rd_finish>
+
+000001be <immediate_7>:
+ 1be:	402f      	ands	r7, r5
+ 1c0:	e727      	b.n	12 <write_rd_finish>
+
+000001c2 <execute_register>:
+ 1c2:	0453      	lsls	r3, r2, #17
+ 1c4:	0f5b      	lsrs	r3, r3, #29
+ 1c6:	0b55      	lsrs	r5, r2, #13
+ 1c8:	f015 057c 	ands.w	r5, r5, #124	; 0x7c
+ 1cc:	5945      	ldr	r5, [r0, r5]
+ 1ce:	0c96      	lsrs	r6, r2, #18
+ 1d0:	f016 067c 	ands.w	r6, r6, #124	; 0x7c
+ 1d4:	5986      	ldr	r6, [r0, r6]
+ 1d6:	0e57      	lsrs	r7, r2, #25
+ 1d8:	2f01      	cmp	r7, #1
+ 1da:	d02b      	beq.n	234 <execute_register_muldiv>
+ 1dc:	e8df f003 	tbb	[pc, r3]
+
+000001e0 <register_table>:
+ 1e0:	130e0904 	movwne	r0, #59652	; 0xe904
+ 1e4:	27241b18 			; <UNDEFINED> instruction: 0x27241b18
+
+000001e8 <register_0>:
+ 1e8:	2f20      	cmp	r7, #32
+ 1ea:	bf0c      	ite	eq
+ 1ec:	1baf      	subeq	r7, r5, r6
+ 1ee:	19af      	addne	r7, r5, r6
+ 1f0:	e70f      	b.n	12 <write_rd_finish>
+
+000001f2 <register_1>:
+ 1f2:	f016 061f 	ands.w	r6, r6, #31
+ 1f6:	fa15 f706 	lsls.w	r7, r5, r6
+ 1fa:	e70a      	b.n	12 <write_rd_finish>
+
+000001fc <register_2>:
+ 1fc:	42b5      	cmp	r5, r6
+ 1fe:	bfb4      	ite	lt
+ 200:	2701      	movlt	r7, #1
+ 202:	2700      	movge	r7, #0
+ 204:	e705      	b.n	12 <write_rd_finish>
+
+00000206 <register_3>:
+ 206:	42b5      	cmp	r5, r6
+ 208:	bf34      	ite	cc
+ 20a:	2701      	movcc	r7, #1
+ 20c:	2700      	movcs	r7, #0
+ 20e:	e700      	b.n	12 <write_rd_finish>
+
+00000210 <register_4>:
+ 210:	ea95 0706 	eors.w	r7, r5, r6
+ 214:	e6fd      	b.n	12 <write_rd_finish>
+
+00000216 <register_5>:
+ 216:	f016 061f 	ands.w	r6, r6, #31
+ 21a:	2f20      	cmp	r7, #32
+ 21c:	bf0c      	ite	eq
+ 21e:	fa45 f706 	asreq.w	r7, r5, r6
+ 222:	fa25 f706 	lsrne.w	r7, r5, r6
+ 226:	e6f4      	b.n	12 <write_rd_finish>
+
+00000228 <register_6>:
+ 228:	ea55 0706 	orrs.w	r7, r5, r6
+ 22c:	e6f1      	b.n	12 <write_rd_finish>
+
+0000022e <register_7>:
+ 22e:	ea15 0706 	ands.w	r7, r5, r6
+ 232:	e6ee      	b.n	12 <write_rd_finish>
+
+00000234 <execute_register_muldiv>:
+ 234:	e8df f003 	tbb	[pc, r3]
+
+00000238 <register_muldiv_table>:
+ 238:	100a0704 	andne	r0, sl, r4, lsl #14
+ 23c:	1f191613 	svcne	0x00191613
+
+00000240 <register_muldiv_0>:
+ 240:	fb05 f706 	mul.w	r7, r5, r6
+ 244:	e6e5      	b.n	12 <write_rd_finish>
+
+00000246 <register_muldiv_1>:
+ 246:	fb85 4706 	smull	r4, r7, r5, r6
+ 24a:	e6e2      	b.n	12 <write_rd_finish>
+
+0000024c <register_muldiv_2>:
+ 24c:	fba5 4706 	umull	r4, r7, r5, r6
+ 250:	17ec      	asrs	r4, r5, #31
+ 252:	4034      	ands	r4, r6
+ 254:	1b3f      	subs	r7, r7, r4
+ 256:	e6dc      	b.n	12 <write_rd_finish>
+
+00000258 <register_muldiv_3>:
+ 258:	fba5 4706 	umull	r4, r7, r5, r6
+ 25c:	e6d9      	b.n	12 <write_rd_finish>
+
+0000025e <register_muldiv_4>:
+ 25e:	fb95 f7f6 	sdiv	r7, r5, r6
+ 262:	e6d6      	b.n	12 <write_rd_finish>
+
+00000264 <register_muldiv_5>:
+ 264:	fbb5 f7f6 	udiv	r7, r5, r6
+ 268:	e6d3      	b.n	12 <write_rd_finish>
+
+0000026a <register_muldiv_6>:
+ 26a:	fb95 f4f6 	sdiv	r4, r5, r6
+ 26e:	fb04 f706 	mul.w	r7, r4, r6
+ 272:	1bef      	subs	r7, r5, r7
+ 274:	e6cd      	b.n	12 <write_rd_finish>
+
+00000276 <register_muldiv_7>:
+ 276:	fbb5 f4f6 	udiv	r4, r5, r6
+ 27a:	fb04 f706 	mul.w	r7, r4, r6
+ 27e:	1bef      	subs	r7, r5, r7
+ 280:	e6c7      	b.n	12 <write_rd_finish>
+	...
+
+Disassembly of section .ARM.attributes:
+
+00000000 <.ARM.attributes>:
+   0:	00002041 	andeq	r2, r0, r1, asr #32
+   4:	61656100 	cmnvs	r5, r0, lsl #2
+   8:	01006962 	tsteq	r0, r2, ror #18
+   c:	00000016 	andeq	r0, r0, r6, lsl r0
+  10:	726f4305 	rsbvc	r4, pc, #335544320	; 0x14000000
+  14:	2d786574 	cfldr64cs	mvdx6, [r8, #-464]!	; 0xfffffe30
+  18:	0600334d 	streq	r3, [r0], -sp, asr #6
+  1c:	094d070a 	stmdbeq	sp, {r1, r3, r8, r9, sl}^
+  20:	Address 0x0000000000000020 is out of bounds.
+

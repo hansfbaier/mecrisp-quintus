@@ -1,0 +1,32 @@
+
+$BF886300 constant ANSELD 
+$BF886310 constant TRISD  
+$BF886320 constant PORTD  
+$BF886330 constant LATD   
+$BF886340 constant ODCD   
+$BF886350 constant CNPUD  
+$BF886360 constant CNPDD  
+$BF886370 constant CNCOND 
+$BF886380 constant CNEND  
+$BF886390 constant CNSTATD
+
+ 4 constant CLR
+ 8 constant SET
+12 constant INV
+
+\ RD0: Red LED
+\ RD1: Yellow LED
+\ RD2: Green LED
+
+: blinky ( -- )
+
+  0 ANSELD !      \ Switch all Port D pins to digital mode
+  7 TRISD CLR + !  \ Set LED pins as outputs 
+  
+  64 0 do
+    i 7 and PORTD INV + !  \ Xor LED pins with counter for blinking effect
+    300000 0 do loop
+  loop
+
+  7 PORTD CLR + ! \ All LEDs off
+;

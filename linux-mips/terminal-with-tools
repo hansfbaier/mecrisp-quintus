@@ -1,0 +1,4 @@
+#!/bin/bash
+stty -icanon -echo
+./mecrisp-quintus-linux-mips-with-disassembler-and-math
+stty sane 

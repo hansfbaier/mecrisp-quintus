@@ -1,0 +1,26 @@
+
+The included bitstream contains a PicoRV32 core which is synthesised with 14 kb RAM,
+hardware multiply & divide and compressed instruction support.
+
+How to flash:
+
+iceprog -b hx8k-breakout.bin
+iceprog -o 1M mecrisp-quintus-hx8k.bin
+
+How to communicate:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 2000 -c 3 -n"
+
+Reset wire is connected to DTR, press Ctrl+A Ctrl+T to toggle the line and launch Forth.
+
+You can also run the binary in emulator:
+
+./quintusemu-hx8k mecrisp-quintus-hx8k.bin
+
+
+Picosoc and PicoRV32 are by Clifford Wolf, included here only for convenience.
+
+"PicoRV32 is free and open hardware licensed under the ISC license (a license that is similar in terms to the MIT license or the 2-clause BSD license)."
+
+Get the original here:
+https://github.com/cliffordwolf/picorv32

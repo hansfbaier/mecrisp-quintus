@@ -1,0 +1,45 @@
+\ tft-suite.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+
+\ loads all file dealing with graphics on the tft-display into flash memory
+
+compiletoflash
+
+
+#include  ms.fs                     \ essential
+#include  gd32vf103-104mhz.fs       \ convenience
+: init init 104-init ;              \     "
+104-init                            \     "
+
+#include  Lat15-Terminus32x16.mfnt \ essential for fonts
+#include  mecrisp-fonts.txt        \      "
+cornerstone zeichensaetze          \      "
+
+#include  spi0-hard.txt            \ essential for tft-...
+: init init spi0-init ;
+
+#include  xy-hard.txt              \ essentail for tft-basic
+#include  tft-basics.txt           \ essential for everything
+: init init tft-init ; 
+
+#include  tft-graphics.txt         \ at your wish
+#include  tft-fonts.txt            \ at your wish
+#include  tft-scroll.txt           \ at your wish
+
+
+#include  dump.fs                  \ essential for sd-card, bmp
+#include  mysdcard2.txt            \ essential for bmp
+#include  tft-bmp.txt
+
+Cornerstone allgraphics
+#include  manhattan.fs             \ application example
+#include  fixpt-math-lib.fs        \ essential for turtle 
+#include  turtle.fs                \ application example
+
+compiletoram
+
+tft-init

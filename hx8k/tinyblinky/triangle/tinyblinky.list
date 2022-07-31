@@ -1,0 +1,44 @@
+
+tinyblinky.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <Boot-0x4>:
+   0:	a011                	j	4 <Boot>
+	...
+
+00000004 <Boot>:
+   4:	00100437          	lui	x8,0x100
+   8:	4481                	li	x9,0
+   a:	10000513          	li	x10,256
+   e:	400c                	lw	x11,0(x8)
+  10:	c08c                	sw	x11,0(x9)
+  12:	0411                	addi	x8,x8,4
+  14:	0491                	addi	x9,x9,4
+  16:	1571                	addi	x10,x10,-4
+  18:	f97d                	bnez	x10,e <Boot+0xa>
+  1a:	00000437          	lui	x8,0x0
+  1e:	02240067          	jr	34(x8) # 22 <Reset>
+
+00000022 <Reset>:
+  22:	20000437          	lui	x8,0x20000
+  26:	08040413          	addi	x8,x8,128 # 20000080 <leds>
+
+0000002a <breathe_led>:
+  2a:	0505                	addi	x10,x10,1
+  2c:	00c51593          	slli	x11,x10,0xc
+  30:	0005d463          	bgez	x11,38 <breathe_led+0xe>
+  34:	40b005b3          	neg	x11,x11
+  38:	0e400613          	li	x12,228
+  3c:	02c5b5b3          	mulhu	x11,x11,x12
+  40:	07558593          	addi	x11,x11,117
+  44:	0075f693          	andi	x13,x11,7
+  48:	06a1                	addi	x13,x13,8
+  4a:	818d                	srli	x11,x11,0x3
+  4c:	00b696b3          	sll	x13,x13,x11
+  50:	94b6                	add	x9,x9,x13
+  52:	00d4b6b3          	sltu	x13,x9,x13
+  56:	c014                	sw	x13,0(x8)
+  58:	bfc9                	j	2a <breathe_led>
+  5a:	0001                	nop

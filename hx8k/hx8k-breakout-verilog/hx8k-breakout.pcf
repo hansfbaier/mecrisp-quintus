@@ -1,0 +1,90 @@
+
+set_io D1 C3
+set_io D2 B3
+set_io D3 C4
+set_io D4 C5
+set_io D5 A1
+set_io D6 A2
+set_io D7 B4
+set_io D8 B5
+
+set_io ser_tx B12
+set_io ser_rx B10
+
+set_io oscillator J3
+set_io reset_button A16
+
+set_io flash_csb R12
+set_io flash_clk R11
+set_io flash_io0 P12
+set_io flash_io1 P11
+
+# For QSPI mode the flash chip on the iCE40-HX8K Breakout Board
+# must be replaced with one that supports QSPI and the IO2 and IO3
+# pins must be soldered to T9 and P8 (center on J3)
+
+set_io flash_io2 T9
+set_io flash_io3 P8
+
+
+
+set_io PORTA0  C16
+set_io PORTA1  D16
+set_io PORTA2  E16
+
+set_io PORTA3  F16
+set_io PORTA4  G16
+set_io PORTA5  H16
+
+set_io PORTA6  J15
+set_io PORTA7  G14
+set_io PORTA8  K14
+
+set_io PORTA9  K15
+set_io PORTA10 M16
+set_io PORTA11 N16
+
+set_io PORTA12 P16
+
+
+
+set_io PORTB0  B16
+set_io PORTB1  D14
+set_io PORTB2  D15
+
+set_io PORTB3  E14
+set_io PORTB4  F15
+set_io PORTB5  G15
+
+set_io PORTB6  H14
+set_io PORTB7  F14
+set_io PORTB8  J14
+
+set_io PORTB9  K16
+set_io PORTB10 L16
+set_io PORTB11 M15
+
+set_io PORTB12 P15
+set_io PORTB13 R15
+
+
+
+set_io PORTC0   B2
+set_io PORTC1   C2
+set_io PORTC2   D2
+
+set_io PORTC3   F1
+set_io PORTC4   G1
+set_io PORTC5   H1
+
+set_io PORTC6   J1
+set_io PORTC7   K1
+
+set_io PORTC8   L1
+set_io PORTC9   M1
+set_io PORTC10  N2
+
+set_io PORTC11  P2
+set_io PORTC12  R1
+
+

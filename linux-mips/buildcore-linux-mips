@@ -1,0 +1,33 @@
+#!/bin/bash
+
+stty -icanon -echo
+
+{
+   echo -e "compiletoflash\n"
+   cat ../common/conditional.txt
+   cat ../common/disassembler-mips.txt
+   cat ../common/fixpt-math-lib.fs
+   cat ../common/dictionary-tools.txt
+   cat save.txt
+   echo -e "save\" mecrisp-quintus-linux-mips-with-disassembler-and-math\n"
+   echo -e "bye\n"
+   # cat -
+} | ./mecrisp-quintus-linux-mips
+
+{
+   echo -e "compiletoflash\n"
+   cat ../common/conditional.txt
+   cat ../common/acrobatics.txt
+   cat ../common/disassembler-mips.txt
+   cat ../common/fixpt-math-lib.fs
+   cat ../common/dictionary-tools.txt
+   cat save.txt
+   echo -e "save\" mecrisp-quintus-linux-mips-with-acrobatics-disassembler-and-math\n"
+   echo -e "bye\n"
+   # cat -
+} | ./mecrisp-quintus-linux-mips
+
+stty sane
+
+echo -e ""
+

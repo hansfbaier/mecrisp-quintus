@@ -1,0 +1,41 @@
+\ xy-high-level.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+\ Later on I have to do some calculations with xy-coordinates.
+\ So here are some words to ease it.
+\ the words come in three flavors:
+\ 1. This file: defined in high-level, no advantage in speed
+\    but better legibility
+\ 2. File xy.txt: defined with Matthias's inline assembler -- more speed!
+\ 3. File xy-hard.txt: hard coded - if you won't have
+\    the assembler installed.
+\ Use it to your convenience.
+
+: xy+ ( x y n1 n2 -- x+n1 y+n2 )
+  rot + -rot + swap
+  ;
+
+: xy- ( x y n1 n2 -- x+n1 y+n2 ) 
+  rot - -rot - swap
+  ;
+ 
+: xywh+ ( x y n1 n2 -- x y x+n1 y+n2 )
+  2 pick +
+  swap 3 pick + swap
+  ;
+  
+: xywh- ( x y n1 n2 -- x y x+n1 y+n2 )
+  2 pick -
+  swap 4 pick - swap
+  ;
+
+: xy-minmax ( x0 y0 x1 y1 -- x0 y0 x1 y1 )
+    2dup max -rot min
+    2swap
+    2dup max -rot min
+    2dup
+;
+

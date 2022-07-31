@@ -1,0 +1,168 @@
+\ tft-bmp.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+\ Examples how to read in and how to display *.BMP pictures.
+\ These picture muste be in a special format. With GIMP it
+\ is easy to convert nearly every picture to this format:
+\ Load the picture into GIMP, cut or shrink it to a size that
+\ fits the needs of the display i.e. width/hights < 160/80,
+\ export it: /File/Export As ... . Type in picture name with
+\ extention BMP. A second dialog will open. Now choose
+\ /Advanced Options/16 Bit/R5 G6 B5. Klick 'Export'
+\ Done!
+\ Now copy this picture.bmp to a (formated) SD-card. Make shure
+\ all the sektors of this pictures are in consecutive order.
+\ Find out at which pysical!!! sector of SD-card the picture
+\ datas start. Use external tools for this (Linux Mac -->dd,
+\ Windows ???). If you know how to do this under Windows
+\ let me know!
+\ Now insert the SD-card into your longan nano.
+\ Include this file into your longan nano.
+\ Make a constant with the noticed sektor number or use this
+\ number directly. Wake the word 'show-bmp' with this
+\ sector (constant).
+\ For a first attempt you may use the two pictures in this
+\ tft-suite: dragon36.bmp or flower.bmp
+\ The internal words are self-explainig (I hope).
+
+\ Matthias's SD-card driver was slightly enhaced by Wolfgang
+\ Strauss. I used this. It is in the suite too.
+
+\ Variables
+
+512 constant BpS
+
+0 Variable bmp-header-len \ has to be a multiple of 2
+0 Variable bmp-width
+0 Variable bmp-height
+0 Variable bmp-len
+0 Variable bmp-compressed
+0 Variable bmp-r-mask
+0 Variable bmp-g-mask
+0 Variable bmp-b-mask
+0 Variable bmp-pointer
+0 Variable bmp-sector
+0 Variable bmp-start-sector
+0 Variable bmp-fill
+
+: read-bmp-header ( -- )
+    sd.buf 10 + @ bmp-header-len !
+    sd.buf 18 + @ bmp-width !
+    sd.buf 22 + @ bmp-height !
+    sd.buf 34 + @ bmp-len !
+    sd.buf 30 + @ bmp-compressed !
+    sd.buf 54 + @ bmp-r-mask !
+    sd.buf 58 + @ bmp-g-mask !
+    sd.buf 62 + @ bmp-b-mask !
+;
+
+: bmp-match? ( -- flag )
+    bmp-width @ tft-width @  <
+    bmp-height @ tft-height @ <
+    bmp-compressed @ 3 =
+    bmp-r-mask @ $F800 =
+    bmp-g-mask @ $7e0 =
+    bmp-b-mask @ $1F =
+    or or or or or
+; 
+
+: bmp-init-sectors ( block -- )
+    dup bmp-start-sector !
+    0 bmp-sector !
+    sd-read
+;
+
+\ write one word (16bit) from SD-card to the display
+
+: @bmp>tft ( -- )
+    bmp-pointer @
+    BpS /mod
+    dup bmp-sector @ = 
+    IF drop
+    ELSE
+        dup bmp-sector !
+        bmp-start-sector @ +
+        sd-read 
+    THEN
+    sd.buf + h@
+    2bytes>tft
+    2 bmp-pointer +!
+;
+
+\ set the area that will be filled with the BMP datas
+
+: bmp-set-shape ( -- )
+    tft-width @ bmp-width @ - 2/   \ center
+    tft-height @ bmp-height @ - 2/ \ center
+    bmp-width @ 1-
+    bmp-height @ 1- xywh+
+    set-shape
+;
+
+
+\ primitve 'file' handling. Look if the given sector is
+\ a BMP header, adjust file pointer.
+
+: bmp-open  ( start-sector -- )
+    sd-init-silent
+    bmp-init-sectors
+    read-bmp-header
+    bmp-match?
+    IF  4 bmp-width @ 4 mod - 4 mod bmp-fill !
+        bmp-set-shape
+        bmp-header-len @ bmp-pointer !
+    ELSE 
+        ." BMP-Header doesn't match!"
+        quit
+    THEN
+;
+
+\ read-in one line of BMP picture
+: bmp-line ( -- )
+    bmp-width @ 0
+    DO
+        @bmp>tft
+    LOOP
+    bmp-fill @ 0
+    ?DO
+        2 bmp-pointer +!
+    LOOP
+;
+
+\ You must adjust these constants to your needs!
+25920 Constant dragon
+23280 Constant flower
+
+\ Pictures smaller than the display will be centered.
+\ As we read in the picture from the start i.e. bottom
+\ line we have to change the orientation of our display.
+\ This is done via the word mirror-v.
+\ Make shure that now tft-command is written after invoking
+\ 'write-memory'. The sequence ' ... write-memory ...
+\ ... mirror-v ... wont work.
+
+: bmp-show ( start-sector -- )
+    dup
+    mirror-v 
+    bmp-open 
+    write-memory
+    bmp-height @ 0
+    DO
+        bmp-line
+    LOOP
+    mirror-v
+;
+
+: bmp-demo
+    ." Endless Diashow!"
+    BEGIN
+        flower bmp-show
+        2000 ms
+        dragon bmp-show
+        2000 ms
+        key?
+    UNTIL 
+;

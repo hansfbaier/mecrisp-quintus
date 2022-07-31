@@ -1,0 +1,158 @@
+\ spi0-hard.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+\ -----------------------------------------------------------------------------------------
+\ ------------ some registers we need ----------------------------------------------------
+\ -----------------------------------------------------------------------------------------
+
+  $40010000                 Constant APB2_BUS_BASE  
+  APB2_BUS_BASE $00000800 + Constant GPIO_BASE
+      GPIO_BASE $00000000 + Constant GPIOA  
+      GPIO_BASE $00000400 + Constant GPIOB
+
+
+      GPIOA   0 + Constant GPIOA_CTL0
+      GPIOA $10 + Constant GPIOA_BOP
+      GPIOA $14 + Constant GPIOA_BC
+
+      GPIOB   0 + Constant GPIOB_CTL0
+      GPIOB $10 + Constant GPIOB_BOP
+      GPIOB $14 + Constant GPIOB_BC
+
+           $40021000 Constant RCU_BASE
+      RCU_BASE $18 + Constant RCU_APB2EN
+
+            $40013000 Constant SPI0_BASE
+            SPI0_BASE Constant SPI0_CTL0
+        SPI0_BASE 8 + Constant SPI0_STAT
+      SPI0_BASE $0c + Constant SPI0_DATA
+
+
+  \ RCU_APB2EN 
+  \ |1098|7654|3210|9876|5432|1098|7654|3210
+  \ |xxxx|xxxx|xxxx|xxxx|x0x0|000x|x000|00x0 reset=0, x=reserved
+  \ |    |    |    |    | +  |    |    |     USART0RST 0=NO RESET 1=RESET USART0
+  \ |    |    |    |    |   +|    |    |     SPI0RST     "           "    SPI0
+  \ |    |    |    |    |    |+   |    |     TIMER0RST   "           "    TIMER0
+  \ |    |    |    |    |    | +  |    |     ADC1RST     "           "    ADC1
+  \ |    |    |    |    |    |  + |    |     ADC0RST     "           "    ADC0
+  \ |    |    |    |    |    |    | +  |     PERST       "           "    GPIOE
+  \ |    |    |    |    |    |    |  + |     PDRST       "           "    GPIOD
+  \ |    |    |    |    |    |    |   +|     PCRST       "           "    GPIOC
+  \ |    |    |    |    |    |    |    |+    PBRST       "           "    GPIOB
+  \ |    |    |    |    |    |    |    | +   PARST       "           "    GPIOA
+  \ |    |    |    |    |    |    |    |   + AFRST       "           "    Alternate function
+  \ |0000|0000|0000|0001|1010|1010|1011|0001 Example
+
+  \ To switch the portpins high-low we use the BC and BOC registers. 
+  \ They work 'atomar' and we don't have to care about the other bits 
+  \ in the OCD-registers. 
+
+
+ \ PB2 = TFT_CS
+ : -tft-csx ( -- ) %100 GPIOB_BC bis! ; \ deselect TFT
+ : +tft-csx ( -- ) %100 GPIOB_BOP bis! ;  \ select TFT
+
+
+ \  PB1 = TFT_RST 
+ : -tft-rst ( -- ) %10 GPIOB_BC bis! ; \ RESET the TFT driver chip 
+ : +tft-rst ( -- ) %10 GPIOB_BOP bis! ; \ awake the TFT driver chip 
+
+ \ The DC-line decides if a value is handled as data or registeraddress
+ \ PB0 = tft-d/cx
+  : -tft-d/cx ( -- ) %1 GPIOB_BC bis! ; \ register
+  : +tft-d/cx ( -- ) %1 GPIOB_BOP bis! ; \ data
+
+
+  \ 000: PCLK/2
+  \ 001: PCLK/4
+  \ 010: PCLK/8
+  \ 011: PCLK/16
+  \ 100: PCLK/32
+  \ 101: PCLK/64
+  \ 110: PCLK/128
+  \ 111: PCLK/256
+
+  : spi0-config ( -- )
+      +tft-csx
+      \  SPI0_CTL0
+      \  Xaaa.bbbb.cccc.dddd BDEN
+      \  aXaa.bbbb.cccc.dddd BDOEN
+      \  aaXa.bbbb.cccc.dddd CRCEN
+      \  aaaX.bbbb.cccc.dddd CRCNT
+      \  aaaa.Xbbb.cccc.dddd FF16
+      \  aaaa.bXbb.cccc.dddd RO
+      \  aaaa.bbXb.cccc.dddd SWNSSEN
+      \  aaaa.bbbX.cccc.dddd SWNSS
+      \  aaaa.bbbb.Xccc.dddd LF
+      \  aaaa.bbbb.cXcc.dddd SPIEN
+      \  aaaa.bbbb.ccXX.Xddd PSC
+      \  aaaa.bbbb.cccc.dXdd MSTMOD
+      \  aaaa.bbbb.cccc.ddXd CKPL
+      \  aaaa.bbbb.cccc.dddX CKPH
+
+      \ %0010.0011.0100.0111 drop SPI0_CTL0 ! \ clk/2
+      %0010.0011.0100.1111 drop SPI0_CTL0 ! \ clk/4
+      \ %0010.0011.0101.0111 drop SPI0_CTL0 ! \ clk/8
+      \ %0010.0011.0101.1111 drop SPI0_CTL0 ! \ clk/16
+      \ %0010.0011.0110.0111 drop SPI0_CTL0 ! \ clk/32
+      \ %0010.0011.0110.1111 drop SPI0_CTL0 ! \ clk/64
+      \ %0010.0011.0111.0111 drop SPI0_CTL0 ! \ clk/128
+      \ %0010.0011.0111.1111 drop SPI0_CTL0 ! \ clk/256
+  ;
+
+  : spi0-init ( -- )
+      %1.0000.0000.0000 drop    \ enable SPI
+      %1                        \ enable alternate function
+      or RCU_APB2EN bis!        \ ins REGISTER
+      ( AF output mode push-pull 50MHz )
+      $F0F00000 GPIOA_CTL0  bic! \ clear pins 5, 7
+      $B0B00000 GPIOA_CTL0  bis! \ set pins 5, 7
+      ( output mode push-pull 50MHz )
+      $00000FFF GPIOB_CTL0  bic! \ clear pins 0-2
+      $00000333 GPIOB_CTL0  bis! \ set pins 0-2
+      spi0-config
+  ;
+
+  : spi0-conf-ok? ( -- f )
+      spi0_stat @ %100000 and \ get conf_error flag
+      %100000 <>
+  ;
+
+  : transmitt? ( -- f )   \ transmitbuffer ready/empty?
+      spi0_stat @ %10 and \ get TBE flag
+      %10 =
+  ; 
+
+  : receive? ( -- f ) \ recievebuffer ready/full?
+      spi0_stat @ 1 and 0<>
+  ;
+
+  : raw-byte>tft ( n -- n )
+      -tft-csx
+      \  BEGIN transmitt?   UNTIL \ !!!***@@@///&&&%%%!!!
+      spi0_data h!
+      BEGIN receive? UNTIL
+      spi0_data h@   drop
+      +tft-csx
+  ;
+
+  : byte>tft ( n -- )
+      +tft-d/cx
+      raw-byte>tft
+  ;
+
+  : 2bytes>tft ( n -- )
+      +tft-d/cx
+      $100 /mod
+      raw-byte>tft
+      raw-byte>tft
+  ;
+
+  : tft-reg ( n -- )
+      -tft-d/cx
+      raw-byte>tft
+  ;

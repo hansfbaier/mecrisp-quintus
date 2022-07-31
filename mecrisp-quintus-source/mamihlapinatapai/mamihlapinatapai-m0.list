@@ -1,0 +1,434 @@
+
+mamihlapinatapai-m0.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <mamihlapinatapai>:
+   0:	a1ff      	add	r1, pc, #1020	; (adr r1, 400 <riscvboot>)
+   2:	4668      	mov	r0, sp
+   4:	2200      	movs	r2, #0
+   6:	2300      	movs	r3, #0
+   8:	5083      	str	r3, [r0, r2]
+   a:	3204      	adds	r2, #4
+   c:	2a80      	cmp	r2, #128	; 0x80
+   e:	d1fb      	bne.n	8 <mamihlapinatapai+0x8>
+  10:	e04f      	b.n	b2 <mamihlapinatapai_execute>
+
+00000012 <execute_load>:
+  12:	1517      	asrs	r7, r2, #20
+  14:	2b00      	cmp	r3, #0
+  16:	d102      	bne.n	1e <execute_load+0xc>
+  18:	5def      	ldrb	r7, [r5, r7]
+  1a:	b27f      	sxtb	r7, r7
+  1c:	e043      	b.n	a6 <write_rd_finish>
+  1e:	2b01      	cmp	r3, #1
+  20:	d102      	bne.n	28 <execute_load+0x16>
+  22:	5bef      	ldrh	r7, [r5, r7]
+  24:	b23f      	sxth	r7, r7
+  26:	e03e      	b.n	a6 <write_rd_finish>
+  28:	2b02      	cmp	r3, #2
+  2a:	d101      	bne.n	30 <execute_load+0x1e>
+  2c:	59ef      	ldr	r7, [r5, r7]
+  2e:	e03a      	b.n	a6 <write_rd_finish>
+  30:	2b04      	cmp	r3, #4
+  32:	d101      	bne.n	38 <execute_load+0x26>
+  34:	5def      	ldrb	r7, [r5, r7]
+  36:	e036      	b.n	a6 <write_rd_finish>
+  38:	2b05      	cmp	r3, #5
+  3a:	d139      	bne.n	b0 <continue>
+  3c:	5bef      	ldrh	r7, [r5, r7]
+  3e:	e032      	b.n	a6 <write_rd_finish>
+
+00000040 <execute_store>:
+  40:	0517      	lsls	r7, r2, #20
+  42:	0eff      	lsrs	r7, r7, #27
+  44:	1654      	asrs	r4, r2, #25
+  46:	0164      	lsls	r4, r4, #5
+  48:	4327      	orrs	r7, r4
+  4a:	2b00      	cmp	r3, #0
+  4c:	d101      	bne.n	52 <execute_store+0x12>
+  4e:	55ee      	strb	r6, [r5, r7]
+  50:	e02e      	b.n	b0 <continue>
+  52:	2b01      	cmp	r3, #1
+  54:	d101      	bne.n	5a <execute_store+0x1a>
+  56:	53ee      	strh	r6, [r5, r7]
+  58:	e02a      	b.n	b0 <continue>
+  5a:	2b02      	cmp	r3, #2
+  5c:	d128      	bne.n	b0 <continue>
+  5e:	51ee      	str	r6, [r5, r7]
+  60:	e026      	b.n	b0 <continue>
+
+00000062 <execute_jal>:
+  62:	0057      	lsls	r7, r2, #1
+  64:	0dbf      	lsrs	r7, r7, #22
+  66:	007f      	lsls	r7, r7, #1
+  68:	02d4      	lsls	r4, r2, #11
+  6a:	0fe4      	lsrs	r4, r4, #31
+  6c:	02e4      	lsls	r4, r4, #11
+  6e:	4327      	orrs	r7, r4
+  70:	0314      	lsls	r4, r2, #12
+  72:	0e24      	lsrs	r4, r4, #24
+  74:	0324      	lsls	r4, r4, #12
+  76:	4327      	orrs	r7, r4
+  78:	17d4      	asrs	r4, r2, #31
+  7a:	0524      	lsls	r4, r4, #20
+  7c:	4327      	orrs	r7, r4
+  7e:	1d0b      	adds	r3, r1, #4
+  80:	19c9      	adds	r1, r1, r7
+  82:	e004      	b.n	8e <execute_jalr+0xa>
+
+00000084 <execute_jalr>:
+  84:	1517      	asrs	r7, r2, #20
+  86:	1d0b      	adds	r3, r1, #4
+  88:	19e9      	adds	r1, r5, r7
+  8a:	0849      	lsrs	r1, r1, #1
+  8c:	0049      	lsls	r1, r1, #1
+  8e:	0514      	lsls	r4, r2, #20
+  90:	0ee4      	lsrs	r4, r4, #27
+  92:	00a4      	lsls	r4, r4, #2
+  94:	d00d      	beq.n	b2 <mamihlapinatapai_execute>
+  96:	5103      	str	r3, [r0, r4]
+  98:	e00b      	b.n	b2 <mamihlapinatapai_execute>
+
+0000009a <execute_auipc>:
+  9a:	0b17      	lsrs	r7, r2, #12
+  9c:	033f      	lsls	r7, r7, #12
+  9e:	187f      	adds	r7, r7, r1
+  a0:	e001      	b.n	a6 <write_rd_finish>
+
+000000a2 <execute_lui>:
+  a2:	0b17      	lsrs	r7, r2, #12
+  a4:	033f      	lsls	r7, r7, #12
+
+000000a6 <write_rd_finish>:
+  a6:	0514      	lsls	r4, r2, #20
+  a8:	0ee4      	lsrs	r4, r4, #27
+  aa:	00a4      	lsls	r4, r4, #2
+  ac:	d000      	beq.n	b0 <continue>
+  ae:	5107      	str	r7, [r0, r4]
+
+000000b0 <continue>:
+  b0:	3104      	adds	r1, #4
+
+000000b2 <mamihlapinatapai_execute>:
+  b2:	680a      	ldr	r2, [r1, #0]
+  b4:	247f      	movs	r4, #127	; 0x7f
+  b6:	4014      	ands	r4, r2
+  b8:	2c6f      	cmp	r4, #111	; 0x6f
+  ba:	d0d2      	beq.n	62 <execute_jal>
+  bc:	2c37      	cmp	r4, #55	; 0x37
+  be:	d0f0      	beq.n	a2 <execute_lui>
+  c0:	2c17      	cmp	r4, #23
+  c2:	d0ea      	beq.n	9a <execute_auipc>
+  c4:	0315      	lsls	r5, r2, #12
+  c6:	0eed      	lsrs	r5, r5, #27
+  c8:	00ad      	lsls	r5, r5, #2
+  ca:	5945      	ldr	r5, [r0, r5]
+  cc:	2c67      	cmp	r4, #103	; 0x67
+  ce:	d0d9      	beq.n	84 <execute_jalr>
+  d0:	0453      	lsls	r3, r2, #17
+  d2:	0f5b      	lsrs	r3, r3, #29
+  d4:	2c13      	cmp	r4, #19
+  d6:	d03a      	beq.n	14e <execute_immediate>
+  d8:	2c03      	cmp	r4, #3
+  da:	d09a      	beq.n	12 <execute_load>
+  dc:	01d6      	lsls	r6, r2, #7
+  de:	0ef6      	lsrs	r6, r6, #27
+  e0:	00b6      	lsls	r6, r6, #2
+  e2:	5986      	ldr	r6, [r0, r6]
+  e4:	2c33      	cmp	r4, #51	; 0x33
+  e6:	d062      	beq.n	1ae <execute_register>
+  e8:	2c63      	cmp	r4, #99	; 0x63
+  ea:	d002      	beq.n	f2 <execute_branch>
+  ec:	2c23      	cmp	r4, #35	; 0x23
+  ee:	d0a7      	beq.n	40 <execute_store>
+  f0:	e7de      	b.n	b0 <continue>
+
+000000f2 <execute_branch>:
+  f2:	2b00      	cmp	r3, #0
+  f4:	d102      	bne.n	fc <execute_branch+0xa>
+  f6:	42b5      	cmp	r5, r6
+  f8:	d019      	beq.n	12e <branch_take>
+  fa:	e7d9      	b.n	b0 <continue>
+  fc:	2b01      	cmp	r3, #1
+  fe:	d102      	bne.n	106 <execute_branch+0x14>
+ 100:	42b5      	cmp	r5, r6
+ 102:	d114      	bne.n	12e <branch_take>
+ 104:	e7d4      	b.n	b0 <continue>
+ 106:	2b04      	cmp	r3, #4
+ 108:	d102      	bne.n	110 <execute_branch+0x1e>
+ 10a:	42b5      	cmp	r5, r6
+ 10c:	db0f      	blt.n	12e <branch_take>
+ 10e:	e7cf      	b.n	b0 <continue>
+ 110:	2b05      	cmp	r3, #5
+ 112:	d102      	bne.n	11a <execute_branch+0x28>
+ 114:	42b5      	cmp	r5, r6
+ 116:	da0a      	bge.n	12e <branch_take>
+ 118:	e7ca      	b.n	b0 <continue>
+ 11a:	2b06      	cmp	r3, #6
+ 11c:	d102      	bne.n	124 <execute_branch+0x32>
+ 11e:	42b5      	cmp	r5, r6
+ 120:	d305      	bcc.n	12e <branch_take>
+ 122:	e7c5      	b.n	b0 <continue>
+ 124:	2b07      	cmp	r3, #7
+ 126:	d1c3      	bne.n	b0 <continue>
+ 128:	42b5      	cmp	r5, r6
+ 12a:	d200      	bcs.n	12e <branch_take>
+ 12c:	e7c0      	b.n	b0 <continue>
+
+0000012e <branch_take>:
+ 12e:	0517      	lsls	r7, r2, #20
+ 130:	0f3f      	lsrs	r7, r7, #28
+ 132:	007f      	lsls	r7, r7, #1
+ 134:	0054      	lsls	r4, r2, #1
+ 136:	0ea4      	lsrs	r4, r4, #26
+ 138:	0164      	lsls	r4, r4, #5
+ 13a:	4327      	orrs	r7, r4
+ 13c:	0614      	lsls	r4, r2, #24
+ 13e:	0fe4      	lsrs	r4, r4, #31
+ 140:	02e4      	lsls	r4, r4, #11
+ 142:	4327      	orrs	r7, r4
+ 144:	17d4      	asrs	r4, r2, #31
+ 146:	0324      	lsls	r4, r4, #12
+ 148:	4327      	orrs	r7, r4
+ 14a:	19c9      	adds	r1, r1, r7
+ 14c:	e7b1      	b.n	b2 <mamihlapinatapai_execute>
+
+0000014e <execute_immediate>:
+ 14e:	1517      	asrs	r7, r2, #20
+ 150:	2b00      	cmp	r3, #0
+ 152:	d101      	bne.n	158 <execute_immediate+0xa>
+ 154:	197f      	adds	r7, r7, r5
+ 156:	e7a6      	b.n	a6 <write_rd_finish>
+ 158:	2b01      	cmp	r3, #1
+ 15a:	d104      	bne.n	166 <execute_immediate+0x18>
+ 15c:	06ff      	lsls	r7, r7, #27
+ 15e:	0eff      	lsrs	r7, r7, #27
+ 160:	40bd      	lsls	r5, r7
+ 162:	002f      	movs	r7, r5
+ 164:	e79f      	b.n	a6 <write_rd_finish>
+ 166:	2b02      	cmp	r3, #2
+ 168:	d103      	bne.n	172 <execute_immediate+0x24>
+ 16a:	42bd      	cmp	r5, r7
+ 16c:	da07      	bge.n	17e <execute_immediate+0x30>
+ 16e:	2701      	movs	r7, #1
+ 170:	e799      	b.n	a6 <write_rd_finish>
+ 172:	2b03      	cmp	r3, #3
+ 174:	d105      	bne.n	182 <execute_immediate+0x34>
+ 176:	42bd      	cmp	r5, r7
+ 178:	d201      	bcs.n	17e <execute_immediate+0x30>
+ 17a:	2701      	movs	r7, #1
+ 17c:	e793      	b.n	a6 <write_rd_finish>
+ 17e:	2700      	movs	r7, #0
+ 180:	e791      	b.n	a6 <write_rd_finish>
+ 182:	2b04      	cmp	r3, #4
+ 184:	d101      	bne.n	18a <execute_immediate+0x3c>
+ 186:	406f      	eors	r7, r5
+ 188:	e78d      	b.n	a6 <write_rd_finish>
+ 18a:	2b05      	cmp	r3, #5
+ 18c:	d109      	bne.n	1a2 <execute_immediate+0x54>
+ 18e:	06ff      	lsls	r7, r7, #27
+ 190:	0eff      	lsrs	r7, r7, #27
+ 192:	0053      	lsls	r3, r2, #1
+ 194:	d502      	bpl.n	19c <execute_immediate+0x4e>
+ 196:	413d      	asrs	r5, r7
+ 198:	002f      	movs	r7, r5
+ 19a:	e784      	b.n	a6 <write_rd_finish>
+ 19c:	40fd      	lsrs	r5, r7
+ 19e:	002f      	movs	r7, r5
+ 1a0:	e781      	b.n	a6 <write_rd_finish>
+ 1a2:	2b06      	cmp	r3, #6
+ 1a4:	d101      	bne.n	1aa <execute_immediate+0x5c>
+ 1a6:	432f      	orrs	r7, r5
+ 1a8:	e77d      	b.n	a6 <write_rd_finish>
+ 1aa:	402f      	ands	r7, r5
+ 1ac:	e77b      	b.n	a6 <write_rd_finish>
+
+000001ae <execute_register>:
+ 1ae:	0194      	lsls	r4, r2, #6
+ 1b0:	d437      	bmi.n	222 <execute_register_muldiv>
+ 1b2:	2b00      	cmp	r3, #0
+ 1b4:	d105      	bne.n	1c2 <execute_register+0x14>
+ 1b6:	0053      	lsls	r3, r2, #1
+ 1b8:	d501      	bpl.n	1be <execute_register+0x10>
+ 1ba:	1baf      	subs	r7, r5, r6
+ 1bc:	e773      	b.n	a6 <write_rd_finish>
+ 1be:	19af      	adds	r7, r5, r6
+ 1c0:	e771      	b.n	a6 <write_rd_finish>
+ 1c2:	2b01      	cmp	r3, #1
+ 1c4:	d104      	bne.n	1d0 <execute_register+0x22>
+ 1c6:	06f6      	lsls	r6, r6, #27
+ 1c8:	0ef6      	lsrs	r6, r6, #27
+ 1ca:	40b5      	lsls	r5, r6
+ 1cc:	402f      	ands	r7, r5
+ 1ce:	e76a      	b.n	a6 <write_rd_finish>
+ 1d0:	2b02      	cmp	r3, #2
+ 1d2:	d105      	bne.n	1e0 <execute_register+0x32>
+ 1d4:	42b5      	cmp	r5, r6
+ 1d6:	da01      	bge.n	1dc <execute_register+0x2e>
+ 1d8:	2701      	movs	r7, #1
+ 1da:	e764      	b.n	a6 <write_rd_finish>
+ 1dc:	2700      	movs	r7, #0
+ 1de:	e762      	b.n	a6 <write_rd_finish>
+ 1e0:	2b03      	cmp	r3, #3
+ 1e2:	d105      	bne.n	1f0 <execute_register+0x42>
+ 1e4:	42b5      	cmp	r5, r6
+ 1e6:	d201      	bcs.n	1ec <execute_register+0x3e>
+ 1e8:	2701      	movs	r7, #1
+ 1ea:	e75c      	b.n	a6 <write_rd_finish>
+ 1ec:	2700      	movs	r7, #0
+ 1ee:	e75a      	b.n	a6 <write_rd_finish>
+ 1f0:	2b04      	cmp	r3, #4
+ 1f2:	d102      	bne.n	1fa <execute_register+0x4c>
+ 1f4:	4075      	eors	r5, r6
+ 1f6:	002f      	movs	r7, r5
+ 1f8:	e755      	b.n	a6 <write_rd_finish>
+ 1fa:	2b05      	cmp	r3, #5
+ 1fc:	d109      	bne.n	212 <execute_register+0x64>
+ 1fe:	06f6      	lsls	r6, r6, #27
+ 200:	0ef6      	lsrs	r6, r6, #27
+ 202:	0053      	lsls	r3, r2, #1
+ 204:	d502      	bpl.n	20c <execute_register+0x5e>
+ 206:	4135      	asrs	r5, r6
+ 208:	002f      	movs	r7, r5
+ 20a:	e74c      	b.n	a6 <write_rd_finish>
+ 20c:	40f5      	lsrs	r5, r6
+ 20e:	002f      	movs	r7, r5
+ 210:	e749      	b.n	a6 <write_rd_finish>
+ 212:	2b06      	cmp	r3, #6
+ 214:	d102      	bne.n	21c <execute_register+0x6e>
+ 216:	4335      	orrs	r5, r6
+ 218:	002f      	movs	r7, r5
+ 21a:	e744      	b.n	a6 <write_rd_finish>
+ 21c:	4035      	ands	r5, r6
+ 21e:	002f      	movs	r7, r5
+ 220:	e741      	b.n	a6 <write_rd_finish>
+
+00000222 <execute_register_muldiv>:
+ 222:	2b00      	cmp	r3, #0
+ 224:	d102      	bne.n	22c <execute_register_muldiv+0xa>
+ 226:	4375      	muls	r5, r6
+ 228:	002f      	movs	r7, r5
+ 22a:	e73c      	b.n	a6 <write_rd_finish>
+ 22c:	2b01      	cmp	r3, #1
+ 22e:	d102      	bne.n	236 <execute_register_muldiv+0x14>
+ 230:	17f4      	asrs	r4, r6, #31
+ 232:	17ef      	asrs	r7, r5, #31
+ 234:	e038      	b.n	2a8 <multiply>
+ 236:	2b02      	cmp	r3, #2
+ 238:	d102      	bne.n	240 <execute_register_muldiv+0x1e>
+ 23a:	2400      	movs	r4, #0
+ 23c:	17ef      	asrs	r7, r5, #31
+ 23e:	e033      	b.n	2a8 <multiply>
+ 240:	2b03      	cmp	r3, #3
+ 242:	d101      	bne.n	248 <execute_register_muldiv+0x26>
+ 244:	2700      	movs	r7, #0
+ 246:	e032      	b.n	2ae <multiply_unsigned>
+ 248:	2b04      	cmp	r3, #4
+ 24a:	d10d      	bne.n	268 <execute_register_muldiv+0x46>
+ 24c:	2e00      	cmp	r6, #0
+ 24e:	d00f      	beq.n	270 <execute_register_muldiv+0x4e>
+ 250:	17eb      	asrs	r3, r5, #31
+ 252:	18ed      	adds	r5, r5, r3
+ 254:	405d      	eors	r5, r3
+ 256:	17f4      	asrs	r4, r6, #31
+ 258:	1936      	adds	r6, r6, r4
+ 25a:	4066      	eors	r6, r4
+ 25c:	4063      	eors	r3, r4
+ 25e:	f000 f83a 	bl	2d6 <u_slash_mod>
+ 262:	18ff      	adds	r7, r7, r3
+ 264:	405f      	eors	r7, r3
+ 266:	e71e      	b.n	a6 <write_rd_finish>
+ 268:	2b05      	cmp	r3, #5
+ 26a:	d106      	bne.n	27a <execute_register_muldiv+0x58>
+ 26c:	2e00      	cmp	r6, #0
+ 26e:	d101      	bne.n	274 <execute_register_muldiv+0x52>
+ 270:	43f7      	mvns	r7, r6
+ 272:	e718      	b.n	a6 <write_rd_finish>
+ 274:	f000 f82f 	bl	2d6 <u_slash_mod>
+ 278:	e715      	b.n	a6 <write_rd_finish>
+ 27a:	2b06      	cmp	r3, #6
+ 27c:	d10e      	bne.n	29c <execute_register_muldiv+0x7a>
+ 27e:	2e00      	cmp	r6, #0
+ 280:	d101      	bne.n	286 <execute_register_muldiv+0x64>
+ 282:	002f      	movs	r7, r5
+ 284:	e70f      	b.n	a6 <write_rd_finish>
+ 286:	17eb      	asrs	r3, r5, #31
+ 288:	18ed      	adds	r5, r5, r3
+ 28a:	405d      	eors	r5, r3
+ 28c:	17f4      	asrs	r4, r6, #31
+ 28e:	1936      	adds	r6, r6, r4
+ 290:	4066      	eors	r6, r4
+ 292:	f000 f820 	bl	2d6 <u_slash_mod>
+ 296:	18ef      	adds	r7, r5, r3
+ 298:	405f      	eors	r7, r3
+ 29a:	e704      	b.n	a6 <write_rd_finish>
+ 29c:	2e00      	cmp	r6, #0
+ 29e:	d001      	beq.n	2a4 <execute_register_muldiv+0x82>
+ 2a0:	f000 f819 	bl	2d6 <u_slash_mod>
+ 2a4:	002f      	movs	r7, r5
+ 2a6:	e6fe      	b.n	a6 <write_rd_finish>
+
+000002a8 <multiply>:
+ 2a8:	4377      	muls	r7, r6
+ 2aa:	436c      	muls	r4, r5
+ 2ac:	193f      	adds	r7, r7, r4
+
+000002ae <multiply_unsigned>:
+ 2ae:	0c2c      	lsrs	r4, r5, #16
+ 2b0:	0c33      	lsrs	r3, r6, #16
+ 2b2:	435c      	muls	r4, r3
+ 2b4:	193f      	adds	r7, r7, r4
+ 2b6:	0c2c      	lsrs	r4, r5, #16
+ 2b8:	b2ad      	uxth	r5, r5
+ 2ba:	b2b6      	uxth	r6, r6
+ 2bc:	4374      	muls	r4, r6
+ 2be:	436b      	muls	r3, r5
+ 2c0:	4375      	muls	r5, r6
+ 2c2:	2600      	movs	r6, #0
+ 2c4:	18e4      	adds	r4, r4, r3
+ 2c6:	4176      	adcs	r6, r6
+ 2c8:	0436      	lsls	r6, r6, #16
+ 2ca:	19bf      	adds	r7, r7, r6
+ 2cc:	0426      	lsls	r6, r4, #16
+ 2ce:	0c24      	lsrs	r4, r4, #16
+ 2d0:	19ad      	adds	r5, r5, r6
+ 2d2:	4167      	adcs	r7, r4
+ 2d4:	e6e7      	b.n	a6 <write_rd_finish>
+
+000002d6 <u_slash_mod>:
+ 2d6:	2401      	movs	r4, #1
+ 2d8:	2700      	movs	r7, #0
+ 2da:	42b5      	cmp	r5, r6
+ 2dc:	d906      	bls.n	2ec <u_slash_mod+0x16>
+ 2de:	3600      	adds	r6, #0
+ 2e0:	d404      	bmi.n	2ec <u_slash_mod+0x16>
+ 2e2:	0064      	lsls	r4, r4, #1
+ 2e4:	0076      	lsls	r6, r6, #1
+ 2e6:	d401      	bmi.n	2ec <u_slash_mod+0x16>
+ 2e8:	42b5      	cmp	r5, r6
+ 2ea:	d8fa      	bhi.n	2e2 <u_slash_mod+0xc>
+ 2ec:	42b5      	cmp	r5, r6
+ 2ee:	d301      	bcc.n	2f4 <u_slash_mod+0x1e>
+ 2f0:	1bad      	subs	r5, r5, r6
+ 2f2:	4327      	orrs	r7, r4
+ 2f4:	0876      	lsrs	r6, r6, #1
+ 2f6:	0864      	lsrs	r4, r4, #1
+ 2f8:	d1f8      	bne.n	2ec <u_slash_mod+0x16>
+ 2fa:	4770      	bx	lr
+	...
+
+Disassembly of section .ARM.attributes:
+
+00000000 <.ARM.attributes>:
+   0:	00002041 	andeq	r2, r0, r1, asr #32
+   4:	61656100 	cmnvs	r5, r0, lsl #2
+   8:	01006962 	tsteq	r0, r2, ror #18
+   c:	00000016 	andeq	r0, r0, r6, lsl r0
+  10:	726f4305 	rsbvc	r4, pc, #335544320	; 0x14000000
+  14:	2d786574 	cfldr64cs	mvdx6, [r8, #-464]!	; 0xfffffe30
+  18:	0600304d 	streq	r3, [r0], -sp, asr #32
+  1c:	094d070c 	stmdbeq	sp, {r2, r3, r8, r9, sl}^
+  20:	Address 0x0000000000000020 is out of bounds.
+

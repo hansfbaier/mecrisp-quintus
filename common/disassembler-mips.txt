@@ -1,0 +1,349 @@
+
+\ MIPS Disassembler, Copyright (C) 2018  Matthias Koch
+\ This is free software under GNU General Public License v3.
+\ Usage: Specify your target address in disasm-$ and give disasm-step some calls.
+
+\ ------------------------
+\  A quick list of words
+\ ------------------------
+
+: list ( -- )
+  cr
+  dictionarystart
+  begin
+    dup 8 + ctype space
+    dictionarynext
+  until
+  drop
+;
+
+\ ---------------------------------------
+\  Memory pointer and instruction fetch
+\ ---------------------------------------
+
+0 variable disasm-$   \ Current position for disassembling
+
+: disasm-fetch        \ ( -- Data ) Fetches opcodes and operands, increments disasm-$
+    disasm-$ @ @      \             Holt Opcode oder Operand, incrementiert disasm-$
+  4 disasm-$ +!   ;
+
+\ --------------------------------------------------
+\  Try to find address as code start in Dictionary
+\ --------------------------------------------------
+
+: disasm-string ( -- ) \ Takes care of an inline string
+  disasm-$ @ 8 + dup ctype skipstring 4 - disasm-$ !
+;
+
+: name. ( Address -- ) \ If the address is Code-Start of a dictionary word, it gets named.
+  >r
+  dictionarystart
+  begin
+    dup   8 + dup skipstring  r@ = if ."   --> " ctype else drop then
+    dictionarynext
+  until
+  drop
+  r>
+
+  case \ Check for inline strings ! They are introduced by calls to ." or s" internals.
+    ['] (.") of ."   -->  ." [char] " emit space disasm-string [char] " emit endof \ It is ." runtime ?
+    ['] (s") of ."   -->  s" [char] " emit space disasm-string [char] " emit endof \ It is .s runtime ?
+    ['] (c") of ."   -->  c" [char] " emit space disasm-string [char] " emit endof \ It is .c runtime ?
+  endcase
+;
+
+\ -------------------
+\  Beautiful output
+\ -------------------
+
+: u.4  0 <# # # # # #> type ;
+: u.8  0 <# # # # # # # # # #> type ;
+: u.ns 0 <# #s #> type ;
+: const. ."  #" u.ns ;
+: addr. u.8 ;
+
+: .decimal base @ >r decimal . r> base ! ;
+
+: register. ( u -- )
+  case
+    0 of ." $zero" endof
+    dup ." $" decimal u.ns hex
+  endcase ;
+
+\ ----------------------------------------
+\  Disassembler logic and opcode cutters
+\ ----------------------------------------
+
+: inst ( -- x ) disasm-$ @ @ ;
+
+: .rs    ( -- ) inst 21 rshift %11111 and register. ;
+: .rt    ( -- ) inst 16 rshift %11111 and register. ;
+: .rd    ( -- ) inst 11 rshift %11111 and register. ;
+: .shamt ( -- ) inst  6 rshift %11111 and u. ;
+
+\ ---------------
+\  Disassembler
+\ ---------------
+
+0 variable disasm-destination
+
+: disasm-r-3reg  ( -- ) space .rd  ." , " .rs  ." , " .rt ;
+: disasm-r-shift ( -- ) space .rd  ." , " .rt  ." , " .shamt ;
+
+: disasm-r ( -- )
+  inst %111111 and
+  case
+  \ -------------------------
+     0 of ." sll"  disasm-r-shift endof
+   ( 1 )
+     2 of ." srl"  disasm-r-shift endof
+     3 of ." sra"  disasm-r-shift endof
+     4 of ." sllv" disasm-r-3reg endof
+   ( 2 )
+     6 of ." srlv" disasm-r-3reg endof
+     7 of ." srav" disasm-r-3reg endof
+  \ -------------------------
+     8 of ." jr"   disasm-r-3reg endof
+     9 of ." jalr" disasm-r-3reg inst $01E0F809 =  if disasm-destination @ name. then endof
+    10 of ." movz" disasm-r-3reg endof
+    11 of ." movn" disasm-r-3reg endof
+    12 of ." syscall" disasm-r-3reg endof
+    13 of ." break" disasm-r-3reg endof
+  ( 14 )
+    15 of ." sync" disasm-r-3reg endof
+  \ -------------------------
+    16 of ." mfhi" disasm-r-3reg endof
+    17 of ." mthi" disasm-r-3reg endof
+    18 of ." mflo" disasm-r-3reg endof
+    19 of ." mtlo" disasm-r-3reg endof
+  ( 20 )
+  ( 21 )
+  ( 22 )
+  ( 23 )
+  \ -------------------------
+    24 of ." mult"  disasm-r-3reg endof
+    25 of ." multu" disasm-r-3reg endof
+    26 of ." div"   disasm-r-3reg endof
+    27 of ." divu"  disasm-r-3reg endof
+  ( 28 )
+  ( 29 )
+  ( 30 )
+  ( 31 )
+  \ -------------------------
+    32 of ." add"  disasm-r-3reg endof
+    33 of ." addu" disasm-r-3reg endof
+    34 of ." sub"  disasm-r-3reg endof
+    35 of ." subu" disasm-r-3reg endof
+    36 of ." and"  disasm-r-3reg endof
+    37 of ." or"   disasm-r-3reg endof
+    38 of ." xor"  disasm-r-3reg endof
+    39 of ." nor"  disasm-r-3reg endof
+  \ -------------------------
+  ( 40 )
+  ( 41 )
+    42 of ." slt"  disasm-r-3reg endof
+    43 of ." sltu" disasm-r-3reg endof
+  ( 44 )
+  ( 45 )
+  ( 46 )
+  ( 47 )
+  \ -------------------------
+    48 of ." tge"  disasm-r-3reg endof
+    49 of ." tgeu" disasm-r-3reg endof
+    50 of ." tlt"  disasm-r-3reg endof
+    51 of ." tltu" disasm-r-3reg endof
+    52 of ." teq"  disasm-r-3reg endof
+  ( 53 )
+    54 of ." tne"  disasm-r-3reg endof
+  ( 55 )
+  \ -------------------------
+  ( 56 )
+  ( 57 )
+  ( 58 )
+  ( 59 )
+  ( 60 )
+  ( 61 )
+  ( 62 )
+  ( 63 )
+  \ -------------------------
+    ." Unknown R-Opcode " dup u.
+
+  space
+  .rd  ." , "
+  .rs  ." , "
+  .rt  ."   "
+  .shamt
+
+  endcase
+
+;
+
+: disasm-j ( -- )
+        inst $03FFFFFF and 2 lshift
+  disasm-$ @ $F0000000 and or
+
+  dup space u.8 name.
+;
+
+: disasm-i ( -- )
+  space
+  .rt  ." , "
+  .rs  ." , "
+  inst $FFFF and u.4
+;
+
+: sign16 ( x -- x* ) 16 lshift 16 arshift inline 1-foldable ;
+
+: disasm-i-branch ( -- )
+  space
+  .rs  ." , "
+  .rt  ." , "
+  inst $FFFF and sign16 2 lshift 8 + disasm-$ @ + u.8
+;
+
+: disasm-i-loadstore ( -- )
+  space
+  .rt  ." , "
+  inst $FFFF and u.4
+  ." (" .rs ." )"
+;
+
+: disasm-regimm ( -- )
+  inst 16 rshift %11111 and
+
+  case
+  \ -------------------------
+     0 of ." bltz"  disasm-i-branch endof
+     1 of ." bgez"  disasm-i-branch endof
+  \ -------------------------
+    ." Unknown Regimm-Opcode " dup u.
+
+  endcase
+;
+
+: disasm ( -- ) \ Disassembles one machine instruction and advances disasm-$
+
+  inst $00000000 = if ." nop" 4 disasm-$ +! exit then
+
+  inst 26 rshift
+  case
+  \ -------------------------
+     0 of disasm-r endof            \ R-Format
+     1 of disasm-regimm endof       \ RegImm-Format
+     2 of ." j"    disasm-j endof   \ J-Format
+     3 of ." jal"  disasm-j endof   \ J-Format
+     4 of ." beq"  disasm-i-branch endof   \ --> I-Format
+     5 of ." bne"  disasm-i-branch endof
+     6 of ." blez" disasm-i-branch endof
+     7 of ." bgtz" disasm-i-branch endof
+  \ -------------------------
+     8 of ." addi"   disasm-i endof
+     9 of ." addiu"  disasm-i endof
+    10 of ." slti"   disasm-i endof
+    11 of ." sltiu"  disasm-i endof
+    12 of ." andi"   disasm-i endof
+    13 of ." ori"    disasm-i disasm-destination @ inst $FFFF and or disasm-destination ! endof
+    14 of ." xori"   disasm-i endof
+    15 of ." lui"    disasm-i inst $FFFF and 16 lshift disasm-destination ! endof
+  \ -------------------------
+    16 of ." cop0"   disasm-i endof
+  ( 17 )
+    18 of ." cop2"   disasm-i endof
+  ( 19 )
+    20 of ." beql"   disasm-i-branch endof
+    21 of ." bnel"   disasm-i-branch endof
+    22 of ." blezl"  disasm-i-branch endof
+    23 of ." bgtzl"  disasm-i-branch endof
+  \ -------------------------
+  ( 24 )
+  ( 25 )
+  ( 26 )
+  ( 27 )
+  ( 28 )
+  ( 29 )
+  ( 30 )
+  ( 31 )
+  \ -------------------------
+    32 of ." lb"     disasm-i-loadstore endof
+    33 of ." lh"     disasm-i-loadstore endof
+    34 of ." lwl"    disasm-i-loadstore endof
+    35 of ." lw"     disasm-i-loadstore endof
+    36 of ." lbu"    disasm-i-loadstore endof
+    37 of ." lhu"    disasm-i-loadstore endof
+    38 of ." lwr"    disasm-i-loadstore endof
+  ( 39 )
+  \ -------------------------
+    40 of ." sb"     disasm-i-loadstore endof
+    41 of ." sh"     disasm-i-loadstore endof
+    42 of ." swl"    disasm-i-loadstore endof
+    43 of ." sw"     disasm-i-loadstore endof
+  ( 44 )
+  ( 45 )
+    46 of ." swr"    disasm-i endof
+    47 of ." cache"  disasm-i endof
+  \ -------------------------
+    48 of ." ll"     disasm-i endof
+  ( 49 )
+    50 of ." lwc2"   disasm-i endof
+    51 of ." pref"   disasm-i endof
+  ( 52 )
+  ( 53 )
+  ( 54 )
+  ( 55 )
+  \ -------------------------
+    56 of ." sc"     disasm-i endof
+  ( 57 )
+    58 of ." swc2"   disasm-i endof
+  ( 59 )
+  ( 60 )
+  ( 61 )
+  ( 62 )
+  ( 63 )
+  \ -------------------------
+    ." Unknown I-Opcode " dup u.
+  endcase
+
+  4 disasm-$ +!
+;
+
+\ ------------------------------
+\  Single instruction printing
+\ ------------------------------
+
+: memstamp \ ( Addr -- ) Shows a memory location nicely
+    dup u.8 ." : " @ u.8 ."   " ;
+
+: disasm-step ( -- )
+    disasm-$ @                 \ Note current position
+    dup memstamp disasm cr     \ Disassemble one instruction
+
+    begin \ Write out all disassembled memory locations
+      4 + dup disasm-$ @ <>
+    while
+      dup memstamp cr
+    repeat
+    drop
+;
+
+\ ------------------------------
+\  Disassembler for definitions
+\ ------------------------------
+
+: seec ( -- ) \ Continues to see
+  base @ hex cr
+
+  begin
+    disasm-$ @ addrinflash?
+    disasm-$ @ addrinram?    or not
+    disasm-$ @ 4 - @ $03E00008 = or \ Flag: Loop terminates with branch delay slot after return or when leaving memory area.
+    disasm-step
+  until
+
+  base !
+;
+
+: see ( -- ) \ Takes name of definition and shows its contents from beginning to first ret
+  ' disasm-$ !
+  seec
+;
+

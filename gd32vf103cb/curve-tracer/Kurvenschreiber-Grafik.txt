@@ -1,0 +1,76 @@
+
+\ Kurvenschreiber für Longan Nano
+
+\ Benötigt basisdefinitions.txt, analog.txt und grafik.txt
+
+\ Freie ADCs: PA0, PA3 und PA6.
+\ DACs an PA4 (frei!) und PA5 (geteilt mit dem Display, leider)
+
+\ Beschaltung:
+
+\ PA4 DAC >---
+\            |
+\          Prüfling
+\            |
+\ PA3 ADC <--o
+\            |
+\           ---
+\  680 Ohm  | |
+\           | |
+\           ---
+\            |
+\           PA0
+
+: adc0-conversion-256 ( -- u )
+  0
+  256 0 do adc0-conversion + loop
+  8 rshift
+;
+
+: putpixel-skaliert ( x y -- ) \ Wertebereich von -4096 bis +4096 für x und y
+  swap 4096 + 52 /              \ x
+  swap 4096 + 104 / 79 swap -    \ y
+  putpixel
+;
+
+: kurve ( -- )
+
+  image 25600 $00 fill
+
+  $1000 0 do
+    i 0 dacs
+
+    0 PORTA_ODR ! \ PA0 Low
+    10 0 do loop
+    adc0-conversion-256
+
+    i over - ( PA0L DAC-PA0L ) swap ( DAC-PA0L PA0L )
+    $0055 farbe ! putpixel-skaliert
+
+    1 PORTA_ODR ! \ PA0 High
+    10 0 do loop
+    adc0-conversion-256
+
+    i over - ( PA0H DAC-PA0H ) swap 4096 - ( DAC-PA0H PA0H-4096 )
+    $a0a0 farbe ! putpixel-skaliert
+
+  8 +loop
+
+  refresh
+;
+
+: init ( -- )
+  init
+  72mhz
+  tft-init
+
+  init-dac
+  init-adc0
+  3 ADC0_SQR3 ! \ Select channel 3
+
+  $B4B00442 PORTA_CRL ! \ Switch PA3 and PA4 to analog mode and PA0 to output. Keep SPI wires.
+
+  begin
+    kurve
+  key? until
+;

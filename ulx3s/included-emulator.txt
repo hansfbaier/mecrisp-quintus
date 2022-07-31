@@ -1,0 +1,2246 @@
+\ -----------------------------------------------------------------------------
+\   Conditional compilation
+\ -----------------------------------------------------------------------------
+\ ."  ok." added to nexttoken (for e4thcom compatibility) MM-201227
+
+\ Idea similar to http://lars.nocrew.org/dpans/dpansa15.htm#A.15.6.2.2532
+
+: nexttoken ( -- addr len )
+  begin
+    token          \ Fetch new token.
+  dup 0= while      \ If length of token is zero, end of line is reached.
+\   2drop cr query   \ Fetch new line.
+    2drop ."  ok." cr query  \ Tell the terminal or user to send a next line.
+  repeat
+;
+
+: [else] ( -- )
+  1 \ Initial level of nesting
+  begin
+    nexttoken ( level addr len )
+
+    2dup s" [if]"     compare
+ >r 2dup s" [ifdef]"  compare r> or
+ >r 2dup s" [ifndef]" compare r> or
+
+    if
+      2drop 1+  \ One more level of nesting
+    else
+      2dup s" [else]" compare
+      if
+        2drop 1- dup if 1+ then  \ Finished if [else] is reached in level 1. Skip [else] branch otherwise.
+      else
+        s" [then]" compare if 1- then  \ Level completed.
+      then
+    then
+
+    ?dup 0=
+  until
+
+  immediate 0-foldable
+;
+
+: [then] ( -- ) immediate 0-foldable ;
+
+: [if]   ( ? -- )                 0=  if postpone [else] then immediate 1-foldable ;
+: [ifdef]  ( -- ) token find drop 0=  if postpone [else] then immediate 0-foldable ;
+: [ifndef] ( -- ) token find drop 0<> if postpone [else] then immediate 0-foldable ;
+
+
+\ RISC-V 32 IMC Disassembler, Copyright (C) 2018  Matthias Koch
+\ This is free software under GNU General Public License v3.
+\ Usage: Specify your target address in disasm-$ and give disasm-step some calls.
+
+\ ------------------------
+\  A quick list of words
+\ ------------------------
+
+: list ( -- )
+  cr
+  dictionarystart
+  begin
+    dup 8 + ctype space
+    dictionarynext
+  until
+  drop
+;
+
+\ ---------------------------------------
+\  Memory pointer and instruction fetch
+\ ---------------------------------------
+
+0 variable disasm-$   \ Current position for disassembling
+
+\ --------------------------------------------------
+\  Try to find address as code start in Dictionary
+\ --------------------------------------------------
+
+: disasm-string ( -- ) \ Takes care of an inline string
+
+  disasm-$ @
+
+  \ Skip opcode, print string and find correct location to continue
+  \ Disassembler is adding the opcode length later, therefore the subtraction
+
+  dup h@
+  3 and 3 = if   4 + dup ctype skipstring 4 -
+            else 2 + dup ctype skipstring 2 -
+            then
+
+  disasm-$ !
+;
+
+: name. ( Address -- ) \ If the address is Code-Start of a dictionary word, it gets named.
+  >r
+  dictionarystart
+  begin
+    dup   8 + dup skipstring  r@ = if ."   --> " ctype else drop then
+    dictionarynext
+  until
+  drop
+  r>
+
+  case \ Check for inline strings ! They are introduced by calls to ." or s" internals.
+    ['] (.") of ."   -->  ." [char] " emit space disasm-string [char] " emit endof \ It is ." runtime ?
+    ['] (s") of ."   -->  s" [char] " emit space disasm-string [char] " emit endof \ It is .s runtime ?
+    ['] (c") of ."   -->  c" [char] " emit space disasm-string [char] " emit endof \ It is .c runtime ?
+  endcase
+;
+
+\ -------------------
+\  Beautiful output
+\ -------------------
+
+: u.2  0 <# # # #> type ;
+: u.4  0 <# # # # # #> type ;
+: u.8  0 <# # # # # # # # # #> type ;
+: u.ns 0 <# #s #> type ;
+: const. ."  #" u.ns ;
+: addr. u.8 ;
+
+: .decimal base @ >r decimal . r> base ! ;
+
+: register. ( u -- )
+  $1F and
+  case
+    0 of ." zero" endof
+    dup ." x" decimal u.ns hex
+  endcase ;
+
+\ ----------------------------------------
+\  Disassembler logic and opcode cutters
+\ ----------------------------------------
+
+: inst ( -- x ) disasm-$ @ dup 2 + h@ 16 lshift swap h@ or ; \ Unaligned 32 bit fetch
+
+: funct3 ( -- x ) inst 12 rshift $07 and ;
+: funct7 ( -- x ) inst 25 rshift ;
+
+: .rs1 ( -- ) inst 15 rshift register. ;
+: .rs2 ( -- ) inst 20 rshift register. ;
+: .rd  ( -- ) inst  7 rshift register. ;
+
+: imm_i  ( -- x ) inst 20 arshift ;
+
+: imm_s  ( -- x ) inst $FE000000 and 20 arshift
+                  inst 7 rshift $1F and or ;
+
+: imm_sb ( -- x ) inst   31 12 - rshift   1 12 lshift and
+                  inst   25  5 - rshift          $7E0 and   or
+                  inst    8  1 - rshift           $1E and   or
+                  inst   11  7 - lshift   1 11 lshift and   or
+                  19 lshift 19 arshift ;
+
+: imm_u  ( -- x ) inst $FFFFF000 and ;
+
+: imm_uj ( -- x ) inst   31 20 - rshift   1 20 lshift and
+                  inst   21  1 - rshift          $7FE and   or
+                  inst   20 11 - rshift   1 11 lshift and   or
+                  inst                         $FF000 and   or
+                  11 lshift 11 arshift ;
+
+\ ---------------
+\  Disassembler
+\ ---------------
+
+0 variable disasm-destination
+
+: disasm-load ( -- )
+
+  funct3
+  case
+    0 of ." lb     " endof
+    1 of ." lh     " endof
+    2 of ." lw     " endof
+    4 of ." lbu    " endof
+    5 of ." lhu    " endof
+  endcase
+
+  .rd ." , " imm_i . ." (" .rs1 ." )"
+;
+
+: disasm-immediate ( -- )
+
+  imm_i
+
+  funct3
+  case
+    0 of ." addi   " endof
+    1 of ." slli   " endof
+    2 of ." slti   " endof
+    3 of ." sltiu  " endof
+    4 of ." xori   " dup disasm-destination xor! endof
+    5 of inst 26 rshift 16 = if ." srai   " else ." srli   " then $1F and endof
+    6 of ." ori    " endof
+    7 of ." andi   " endof
+  endcase
+
+  .rd ." , " .rs1 ." , " .
+;
+
+: disasm-auipc ( -- )
+  ." auipc  " .rd ." , " imm_u u.8
+;
+
+: disasm-store ( -- )
+
+  funct3
+  case
+    0 of ." sb     " endof
+    1 of ." sh     " endof
+    2 of ." sw     " endof
+  endcase
+
+  .rs2 ." , " imm_s . ." (" .rs1 ." )"
+;
+
+: disasm-register ( -- )
+
+  funct7 1 = \ Multiplication & Division RV32M
+  if
+    funct3
+    case
+      0 of ." mul    " endof
+      1 of ." mulh   " endof
+      2 of ." mulhsu " endof
+      3 of ." mulhu  " endof
+      4 of ." div    " endof
+      5 of ." divu   " endof
+      6 of ." rem    " endof
+      7 of ." remu   " endof
+    endcase
+  else
+    funct3
+    case
+      0 of funct7 32 = if ." sub    " else ." add    " then endof
+      1 of ." sll    " endof
+      2 of ." slt    " endof
+      3 of ." sltu   " endof
+      4 of ." xor    " endof
+      5 of funct7 32 = if ." sra    " else ." srl    " then endof
+      6 of ." or     " endof
+      7 of ." and    " endof
+    endcase
+  then
+
+  .rd ." , " .rs1 ." , " .rs2
+;
+
+: disasm-lui ( -- )
+  ." lui    " .rd ." , " imm_u u.8
+  imm_u disasm-destination !
+;
+
+: disasm-branch ( -- )
+
+  funct3
+  case
+    0 of ." beq    " endof
+    1 of ." bne    " endof
+    4 of ." blt    " endof
+    5 of ." bge    " endof
+    6 of ." bltu   " endof
+    7 of ." bgeu   " endof
+  endcase
+
+  .rs1 ." , " .rs2 ." , " disasm-$ @ imm_sb + u.8
+;
+
+: disasm-jalr ( -- )
+  ." jalr   " .rd ." , " imm_i . ." (" .rs1 ." )"
+
+  inst 15 rshift $1F and 15 = if disasm-destination @ imm_i + name. then
+;
+
+: disasm-jal
+  ." jal    " .rd ." , " disasm-$ @ imm_uj + dup u.8 name.
+;
+
+: disasm-system ( -- )
+
+  funct3
+  ?dup
+  if \ CSR...
+  case
+
+    1 of ." csrrw  " endof
+    2 of ." csrrs  " endof
+    3 of ." csrrc  " endof
+
+    5 of ." csrrwi " endof
+    6 of ." csrrsi " endof
+    7 of ." csrrci " endof
+  endcase
+
+  .rd ." , "
+  inst 20 rshift u.4  ." , "
+  funct3 5 u< if .rs1 else inst 15 rshift $1F and u.2 then
+
+  else \ PRIV
+    inst 20 rshift
+
+    case
+      $000 of ." ecall"  endof
+      $001 of ." ebreak" endof
+      $105 of ." wfi"    endof
+      $302 of ." mret"   endof
+
+      ." Unknown system opcode"
+    endcase
+  then
+;
+
+\ -------------------------------------------
+\  Compressed instruction set opcode cutters
+\ -------------------------------------------
+
+: rvc-inst  ( -- x ) disasm-$ @ h@ ;
+: rvc-func3 ( -- x ) rvc-inst 13 rshift ;
+: rvc-reg.  ( x -- ) 7 and 8 + register. ;
+
+: imm_css   ( -- x )
+                     rvc-inst  7 rshift   3 and  6 lshift
+                     rvc-inst  9 rshift  $F and  2 lshift or ;
+
+: imm_csl   ( -- x )
+                     rvc-inst 12 rshift   1 and  5 lshift
+                     rvc-inst  2 rshift   3 and  6 lshift or
+                     rvc-inst  4 rshift   7 and  2 lshift or ;
+
+: imm_cu    ( -- x ) rvc-inst  2 rshift $1F and
+                     rvc-inst 12 rshift   1 and  5 lshift or ;
+
+: imm_c     ( -- x ) rvc-inst  2 rshift $1F and
+                     rvc-inst 12 rshift   1 and  5 lshift or  26 lshift 26 arshift ;
+
+: imm_clwsw ( -- x ) rvc-inst  5 rshift   1 and  6 lshift
+                     rvc-inst  6 rshift   1 and  2 lshift or
+                     rvc-inst 10 rshift   7 and  3 lshift or ;
+
+: imm_cj    ( -- x ) rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   7 and  1 lshift or
+                     rvc-inst  6 rshift   1 and  7 lshift or
+                     rvc-inst  7 rshift   1 and  6 lshift or
+                     rvc-inst  8 rshift   1 and 10 lshift or
+                     rvc-inst  9 rshift   3 and  8 lshift or
+                     rvc-inst 11 rshift   1 and  4 lshift or
+                     rvc-inst 12 rshift   1 and 11 lshift or  20 lshift 20 arshift ;
+
+: imm_cb    ( -- x ) rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   3 and  1 lshift or
+                     rvc-inst  5 rshift   3 and  6 lshift or
+                     rvc-inst 10 rshift   3 and  3 lshift or
+                     rvc-inst 12 rshift   1 and  8 lshift or  23 lshift 23 arshift ;
+
+: imm_addi4spn ( -- x )
+                     rvc-inst  5 rshift   1 and  3 lshift
+                     rvc-inst  6 rshift   1 and  2 lshift or
+                     rvc-inst  7 rshift  $F and  6 lshift or
+                     rvc-inst 11 rshift   3 and  4 lshift or ;
+
+: imm_addi16sp ( -- x )
+                     rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   3 and  7 lshift or
+                     rvc-inst  5 rshift   1 and  6 lshift or
+                     rvc-inst  6 rshift   1 and  4 lshift or
+                     rvc-inst 12 rshift   1 and  9 lshift or ;
+
+
+: disasm-compressed ( -- )
+    rvc-inst 3 and
+    case
+      %00 of
+            rvc-func3
+            case
+              %000 of rvc-inst 0= if ." c.illegal" else
+                  ." c.addi4spn " rvc-inst 2 rshift rvc-reg. ." , " imm_addi4spn . then endof
+              %010 of ." c.lw   " rvc-inst 2 rshift rvc-reg. ." , " imm_clwsw . ." (" rvc-inst 7 rshift rvc-reg. ." )" endof
+              %110 of ." c.sw   " rvc-inst 2 rshift rvc-reg. ." , " imm_clwsw . ." (" rvc-inst 7 rshift rvc-reg. ." )" endof
+              ." Unknown compressed quadrant 0 opcode"
+            endcase
+          endof
+
+      %01 of
+            rvc-func3
+            case
+              %000 of ." c.addi " rvc-inst 7 rshift register. ." , " imm_c . endof
+              %010 of ." c.li   " rvc-inst 7 rshift register. ." , " imm_c . endof
+
+              %110 of ." c.beqz " rvc-inst 7 rshift rvc-reg. ." , " disasm-$ @ imm_cb + u.8 endof
+              %111 of ." c.bnez " rvc-inst 7 rshift rvc-reg. ." , " disasm-$ @ imm_cb + u.8 endof
+
+              %001 of ." c.jal  " disasm-$ @ imm_cj + dup u.8 name. endof
+              %101 of ." c.j    " disasm-$ @ imm_cj + dup u.8 name. endof
+
+              %011 of rvc-inst 7 rshift $1F and 2 =
+                      if   ." c.addi16sp " imm_addi16sp .
+                      else ." c.lui  " rvc-inst 7 rshift register. ." , " imm_c 12 lshift u.8
+                      then
+                   endof
+
+              %100 of
+                     rvc-inst $0C00 and $0000 = if ." c.srli " rvc-inst 7 rshift rvc-reg. ." , " imm_cu . then
+                     rvc-inst $0C00 and $0400 = if ." c.srai " rvc-inst 7 rshift rvc-reg. ." , " imm_cu . then
+                     rvc-inst $0C00 and $0800 = if ." c.andi " rvc-inst 7 rshift rvc-reg. ." , " imm_c  . then
+                     rvc-inst $1C00 and $0C00 =
+                     if
+                       rvc-inst 5 rshift 3 and
+                       case
+                         %00 of ." c.sub  " endof
+                         %01 of ." c.xor  " endof
+                         %10 of ." c.or   " endof
+                         %11 of ." c.and  " endof
+                       endcase
+                       rvc-inst 7 rshift rvc-reg. ." , " rvc-inst 2 rshift rvc-reg.
+                     then
+                   endof
+            endcase
+          endof
+
+      %10 of
+            rvc-func3
+            case
+              %000 of ." c.slli " rvc-inst 7 rshift register. ." , " imm_cu . endof
+              %010 of ." c.lwsp " rvc-inst 7 rshift register. ." , " imm_csl . ." (x2)" endof
+              %110 of ." c.swsp " rvc-inst 2 rshift register. ." , " imm_css . ." (x2)" endof
+
+              %100 of
+                     rvc-inst $1000 and
+                     if
+                       rvc-inst 2 rshift $3FF and 0=
+                       if
+                         ." c.ebreak"
+                       else
+                         rvc-inst 2 rshift $1F and 0=
+                         if   ." c.jalr " rvc-inst 7 rshift register.
+                         else ." c.add  " rvc-inst 7 rshift register. ." , " rvc-inst 2 rshift register.
+                         then
+                       then
+                     else
+                       rvc-inst 2 rshift $1F and 0=
+                       if   ." c.jr   " rvc-inst 7 rshift register.
+                       else ." c.mv   " rvc-inst 7 rshift register. ." , " rvc-inst 2 rshift register.
+                       then
+                     then
+                   endof
+
+              ." Unknown compressed quadrant 2 opcode"
+            endcase
+          endof
+    endcase
+;
+
+: disasm ( -- ) \ Disassembles one machine instruction and advances disasm-$
+
+  inst 3 and 3 <>
+  if \ 2 byte opcodes
+
+    disasm-compressed
+    2 disasm-$ +!
+
+  else \ 4 byte opcodes
+
+    inst $7F and
+    case
+      $03 of disasm-load      endof
+      $13 of disasm-immediate endof
+      $17 of disasm-auipc     endof
+      $23 of disasm-store     endof
+      $33 of disasm-register  endof
+      $37 of disasm-lui       endof
+      $63 of disasm-branch    endof
+      $67 of disasm-jalr      endof
+      $6F of disasm-jal       endof
+      $73 of disasm-system    endof
+
+      ." Unknown opcode"
+    endcase
+    4 disasm-$ +!
+  then
+;
+
+\ ------------------------------
+\  Single instruction printing
+\ ------------------------------
+
+: memstamp \ ( Addr -- ) Shows a memory location nicely
+    dup u.8 ." : " h@ u.4 ."   " ;
+
+: disasm-step ( -- )
+    disasm-$ @                 \ Note current position
+    dup memstamp disasm cr     \ Disassemble one instruction
+
+    begin \ Write out all disassembled memory locations
+      2+ dup disasm-$ @ <>
+    while
+      dup memstamp cr
+    repeat
+    drop
+;
+
+\ ------------------------------
+\  Disassembler for definitions
+\ ------------------------------
+
+: seec ( -- ) \ Continues to see
+  base @ hex cr
+
+  begin
+    disasm-$ @ addrinflash?
+    disasm-$ @ addrinram?    or not
+    rvc-inst $8082 =         or
+    inst $00008067 =         or \ Flag: Loop terminates with ret or when leaving memory area.
+    inst $30200073 =         or \       Also check for mret
+    disasm-step
+  until
+
+  base !
+;
+
+: see ( -- ) \ Takes name of definition and shows its contents from beginning to first ret
+  ' disasm-$ !
+  seec
+;
+
+
+\ Assembler for RV32IM, Copyright (C) 2019  Matthias Koch
+\ This is free software under GNU General Public License v3.
+
+\ Resolves constants, symbols and variable names and
+\ gives you a comfortable way to write machine instructions.
+
+\ In order to prevent a lot of name collisions,
+\  all assembler opcodes start with _
+
+\ -----------------------------------------------------------------------------
+\ A note on register usage in Mecrisp-Quintus for RISC-V
+\ -----------------------------------------------------------------------------
+
+\  x0  : Contains zero. Hardwired in silicon.
+\  x1  : "Link register", holds link back and is also used to compose long calls with auipc and jalr
+\  x2  : SP Stack pointer for return stack.
+\  x3  : Loop index
+\  x4  : Loop limit
+\  x5  : Scratch register, needs to be saved.
+\  x6  : Scratch register, needs to be saved.
+\  x7  : Scratch register, needs to be saved.
+\  x8  : TOS Top of data stack.
+\  x9  : PSP Data stack pointer.
+\  x10 : Scratch register, needs to be saved.
+\  x11 : Scratch register, needs to be saved.
+\  x12 : Scratch register, needs to be saved.
+\  x13 : Scratch register, needs to be saved.
+\  x14 : Free scratch register, not saved across calls.
+\  x15 : Free scratch register, not saved across calls.
+\
+\  x16 to x31 : Unused in vanilla cores.
+\
+\  Besides x0=zero, nothing is enforced by hardware on this architecture.
+\
+\  Acrobatics compiler is using x16 to x25 are free scratch registers, not saved across calls.
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for strings - Ein paar Stringhelferlein
+\ -----------------------------------------------------------------------------
+
+: vorneabschneiden ( Adresse Länge -- Adresse* Länge* ) \ Remove first character
+  1- swap 1+ swap
+;
+
+: ersteszeichen ( Adresse Länge -- Adresse* Länge* Zeichen ) \ Get first character
+  over c@
+;
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for parsing
+\ -----------------------------------------------------------------------------
+
+\ Muss jetzt noch angegebene Konstanten, Variablen, Wörter und Werte abhandeln.
+\ Das passiert dadurch, dass ich das Ding
+\ - im Dictionary suche
+\     - Falls Variable  --> Variablenadresse
+\     - Falls Puffer    --> Pufferadresse
+\     - Falls Konstante --> Konstante holen
+\ - Versuche in eine Zahl umzuwandeln
+
+\ Konstanten im Flash und Variablen im RAM haben Flag $40, Feste Variablen im Flash haben Flag $81, selbstdefinierte Einfachvariablen $C1 oder Doppeltvariablen $C2.
+
+: symbolparser ( Stringadresse Länge -- value-of-symbol )
+  ( token )
+
+  2dup find ( Adresse Flags ) over 0<>
+        if
+          \ Probe, ob die Flags auf Variablen oder Konstanten hindeuten
+          ( Adresse Flags )
+          $80000000 bic \ Remove visible Flag on some targets
+          swap
+          ( Flags Adresse )
+          over  $40 = if execute then \ Konstanten im RAM und Flash; Variablen im RAM
+          over  $81 = if execute then \ Selbstdefinierte Variablen        im Flash
+          over  $82 = if execute then \ Selbstdefinierte Doppeltvariablen im Flash
+          over $100 = if execute then \ Buffer:
+          nip ( Adresse oder geholte Konstante )
+
+          nip nip exit \ Vergiss Stringadresse, Rücksprung
+        else
+          2drop
+        then
+
+  2dup number 1 = if nip nip exit then \ Vergiss Stringadresse, Rücksprung
+
+  ." Invalid Symbol: " type cr quit
+;
+
+: numberparser ( Stringadresse Länge -- Zahl )
+  2dup 2>r number 1 <> if ." Invalid Value: " 2r> type cr quit else 2rdrop then
+;
+
+: registerparser ( Stringadresse Länge -- Registernummer )
+  ersteszeichen [char] x = if base @ >r decimal
+                             vorneabschneiden
+                             numberparser
+                             dup $1F bic if ." Invalid Register" cr quit then
+                             r> base !
+                           exit
+                           then
+
+  2dup s" zero" compare if 2drop 0 exit then
+
+  ." Invalid Operand" type cr quit
+;
+
+\ -----------------------------------------------------------------------------
+\ A few helpers for immediates in opcodes
+\ -----------------------------------------------------------------------------
+
+: rangeerror ( ... -- ) ." Immediate constant too large" cr quit ;
+
+: 12bitrange? ( n -- ? ) $FFF80000 and dup $FFF80000 = swap 0= or ;
+: 12bitrangecheck ( n -- n ) dup 12bitrange? not if rangeerror then ;
+
+: >imm_i ( n -- x ) 12bitrangecheck 20 lshift ;
+
+: >imm_s ( n -- x ) 12bitrangecheck dup 20 lshift $FE000000 and
+                                    swap $1F and 7 lshift or ;
+
+: >imm_sb ( n -- x ) sb-encoding? not if rangeerror then ;
+: >imm_uj ( n -- x ) uj-encoding? not if rangeerror then ;
+: >imm_u  ( n -- x ) dup $FFF and     if rangeerror then ;
+
+\ -----------------------------------------------------------------------------
+\ Jumps and Labels
+\ -----------------------------------------------------------------------------
+
+0 variable label-
+0 variable label--
+0 variable label---
+
+: l-:   label-- @ label--- !
+        label-  @ label--  !
+        here      label-   !
+immediate ;
+
+\ Forward labels
+\ Idea: Remember place and jump-opcodes to be filled in when label is reached.
+
+0. 2variable label-f1
+0. 2variable label-f2
+0. 2variable label-f3
+0. 2variable label-f4
+0. 2variable label-f5
+0. 2variable label-f6
+0. 2variable label-f7
+0. 2variable label-f8
+
+: check+label ( Sprungkonstruktadresse -- )
+  dup @ 28 rshift ( Addr Labelzähler )
+    dup if \ Ungleich 0 ( Addr Labelzähler )
+
+          1 = if ( Adresse )
+
+                dup 2@ ( Adresse Lückenadresse Labelopcode )
+
+                $10000000 - \ Label 1 auf 0 setzen, damit Opcode stimmt !
+                ( Adresse Lückenadresse Opcode-Bitmaske )
+                here swap
+                ( Adresse Lückenadresse Zieladresse Opcode-Bitmaske )
+
+                >r
+                over - ( Adresse   Lückenadresse Distanz R: Opcode-Bitmaske )
+
+                r@ $0000006F = if >imm_uj else >imm_sb then
+
+                r> or          ( Adresse   Lückenadresse Opcode )
+                swap dup addrinflash? if flash! else ! then
+
+                ( Adresse )
+                >r 0. r> 2!  \ Sprunglabel aus Tabelle löschen
+
+              else
+
+                dup ( Adresse Adresse )
+                @   ( Adresse Labelopcode )
+                $10000000 -  ( Adresse Labelopcode* )
+                swap ( Labelopcode* Adresse )
+                !
+              then
+
+        else \ Null - nichts tun
+          ( Addr Labelzähler )
+          2drop
+        then
+;
+
+: l+:
+  \ Time to fill in opcodes for forward jumps.
+  \ Crawl the notes to see what is pending.
+  label-f1 check+label
+  label-f2 check+label
+  label-f3 check+label
+  label-f4 check+label
+  label-f5 check+label
+  label-f6 check+label
+  label-f7 check+label
+  label-f8 check+label
+immediate ;
+
+: remember+jump ( Zieladresse Opcode )
+  \ Find an empty location in the forward-jump-notes.
+  \ If it contains zero, the fresh wish for a jump can be filled in.
+  label-f1 @ 0= if label-f1 2!  exit then
+  label-f2 @ 0= if label-f2 2!  exit then
+  label-f3 @ 0= if label-f3 2!  exit then
+  label-f4 @ 0= if label-f4 2!  exit then
+  label-f5 @ 0= if label-f5 2!  exit then
+  label-f6 @ 0= if label-f6 2!  exit then
+  label-f7 @ 0= if label-f7 2!  exit then
+  label-f8 @ 0= if label-f8 2!  exit then
+  ." Too many forward references" cr quit
+;
+
+: jump-destination ( Opcode Stringaddress Length -- Opcode Flag )
+    2dup s" +"   compare if 2drop $10000000 or false exit then  \ False: Has to be resolved later
+    2dup s" ++"  compare if 2drop $20000000 or false exit then
+    2dup s" +++" compare if 2drop $30000000 or false exit then
+
+    2dup s" -"   compare if 2drop label-   @  here - true exit then \ True: Insert now
+    2dup s" --"  compare if 2drop label--  @  here - true exit then
+    2dup s" ---" compare if 2drop label--- @  here - true exit then
+
+    \ Choose one:
+
+    numberparser \ For specifying jump offsets directly when not using labels
+
+    \ symbolparser here - \ If you want to reach other definitions with jump opcodes
+    \                      \ *** Caution: Inconsistent results depending on type of destination !
+
+    true
+;
+
+: jumps <builds , $30 setflags
+        does> @ ( Opcode )
+              dup $0000006F <>
+              if
+                token registerparser 15 lshift or
+                token registerparser 20 lshift or
+              then
+
+              token jump-destination
+              if   \ Backward Jump
+                over $0000006F = if >imm_uj else >imm_sb then or ,
+              else \ Forward-Jump
+                here swap remember+jump 4 allot
+              then
+;
+
+\ Conditional branches and unconditional jump:
+
+$63  0 12 lshift or jumps _beq
+$63  1 12 lshift or jumps _bne
+$63  4 12 lshift or jumps _blt
+$63  5 12 lshift or jumps _bge
+$63  6 12 lshift or jumps _bltu
+$63  7 12 lshift or jumps _bgeu
+$6F                 jumps _j     ( jal zero, ... )
+
+\ -----------------------------------------------------------------------------
+\ Simple instructions without operands
+\ -----------------------------------------------------------------------------
+
+: zero-operand <builds , $30 setflags
+                 does> @ , ;
+
+$10500073 zero-operand _wfi
+
+\ -----------------------------------------------------------------------------
+\ Instructions with three register operands
+\ -----------------------------------------------------------------------------
+
+: triple-operand <builds , $30 setflags
+                 does> @ ( Opcode )
+                       token registerparser  7 lshift or
+                       token registerparser 15 lshift or
+                       token registerparser 20 lshift or
+                       ,
+;
+
+$33  0 12 lshift or   1 25 lshift or  triple-operand  _mul
+$33  1 12 lshift or   1 25 lshift or  triple-operand  _mulh
+$33  2 12 lshift or   1 25 lshift or  triple-operand  _mulhsu
+$33  3 12 lshift or   1 25 lshift or  triple-operand  _mulhu
+$33  4 12 lshift or   1 25 lshift or  triple-operand  _div
+$33  5 12 lshift or   1 25 lshift or  triple-operand  _divu
+$33  6 12 lshift or   1 25 lshift or  triple-operand  _rem
+$33  7 12 lshift or   1 25 lshift or  triple-operand  _remu
+
+$33  0 12 lshift or                   triple-operand  _add
+$33  0 12 lshift or  32 25 lshift or  triple-operand  _sub
+$33  1 12 lshift or                   triple-operand  _sll
+$33  2 12 lshift or                   triple-operand  _slt
+$33  3 12 lshift or                   triple-operand  _sltu
+$33  4 12 lshift or                   triple-operand  _xor
+$33  5 12 lshift or                   triple-operand  _srl
+$33  5 12 lshift or  32 25 lshift or  triple-operand  _sra
+$33  6 12 lshift or                   triple-operand  _or
+$33  7 12 lshift or                   triple-operand  _and
+
+\ -----------------------------------------------------------------------------
+\ Instructions with 12 bit immediate operands
+\ -----------------------------------------------------------------------------
+
+: immediate-operand <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser  7 lshift or
+                          token registerparser 15 lshift or
+                          token symbolparser >imm_i or
+                          ,
+;
+
+
+$13  0 12 lshift or                   immediate-operand  _addi
+$13  1 12 lshift or                   immediate-operand  _slli
+$13  2 12 lshift or                   immediate-operand  _slti
+$13  3 12 lshift or                   immediate-operand  _sltiu
+$13  4 12 lshift or                   immediate-operand  _xori
+$13  5 12 lshift or                   immediate-operand  _srli
+$13  5 12 lshift or  32 25 lshift or  immediate-operand  _srai
+$13  6 12 lshift or                   immediate-operand  _ori
+$13  7 12 lshift or                   immediate-operand  _andi
+
+\ -----------------------------------------------------------------------------
+\ Instructions for load and store
+\ -----------------------------------------------------------------------------
+
+: load-opcodes      <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser  7 lshift or
+                          token registerparser 15 lshift or
+                          token numberparser >imm_i or
+                          ,
+;
+
+$03  0 12 lshift or load-opcodes _lb
+$03  1 12 lshift or load-opcodes _lh
+$03  2 12 lshift or load-opcodes _lw
+$03  4 12 lshift or load-opcodes _lbu
+$03  5 12 lshift or load-opcodes _lhu
+
+
+: store-opcodes     <builds , $30 setflags
+                    does> @ ( Opcode )
+                          token registerparser 20 lshift or
+                          token registerparser 15 lshift or
+                          token numberparser >imm_s or
+                          ,
+;
+
+$23  0 12 lshift or store-opcodes _sb
+$23  1 12 lshift or store-opcodes _sh
+$23  2 12 lshift or store-opcodes _sw
+
+\ -----------------------------------------------------------------------------
+\ Instructions with long immediates
+\ -----------------------------------------------------------------------------
+
+: _lui ( -- )
+  $37
+  token registerparser 7 lshift or
+  token numberparser >imm_u or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _auipc ( -- )
+  $17
+  token registerparser 7 lshift or
+  token numberparser >imm_u or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+\ -----------------------------------------------------------------------------
+\ Instructions with jumps
+\ -----------------------------------------------------------------------------
+
+: _jal ( -- )
+  $6F
+  token registerparser 7 lshift or
+  token numberparser >imm_uj or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+
+: _jalr ( -- )
+  $67
+  token registerparser  7 lshift or
+  token registerparser 15 lshift or
+  token numberparser >imm_i or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+
+\ -----------------------------------------------------------------------------
+\ Instructions which are emulated and/or macros
+\ -----------------------------------------------------------------------------
+
+: _mv ( -- )
+  $00000013 \ addi zero, zero, 0
+  token registerparser  7 lshift or
+  token registerparser 15 lshift or
+  ,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _li ( -- )
+  token registerparser
+  token symbolparser
+  swap
+  registerliteral,
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _call ( -- )
+  token symbolparser call,
+immediate inline ; \ This combination gives immediate-compileonly
+
+$00008067 zero-operand _ret \ jalr zero, 0(x1)
+
+: _push ( -- )
+
+  token registerparser 20 lshift
+
+  $FFC10113 ,    \ addi   x2, x2, -4
+  $00012023 or , \ sw zero, 0(x2)
+
+immediate inline ; \ This combination gives immediate-compileonly
+
+: _pop ( -- )
+
+  token registerparser 7 lshift
+
+  $00012003 or , \ lw zero, 0(x2)
+  $00410113 ,    \ addi   x2, x2, 4
+
+immediate inline ; \ This combination gives immediate-compileonly
+
+\ =========================================================================
+\  File: fixpt-math-lib.fs for Mecrisp-Stellaris by Matthias Koch
+\
+\  This file contains these functions for s31.32 fixed point numbers:
+\
+\           sqrt, sin, cos, tan, asin, acos, atan
+\           log2, log10, ln, pow2, pow10, exp
+\
+\ ------------- Comments on sqrt and trig functions -----------------------
+\
+\  All angles are in degrees.
+\
+\  Accuracy is good rounded to 7 significant digits, with some exceptions.
+\  In particular, the asin and acos functions have reduced accuracy
+\  near the endpoints of the range of their inputs (+/-1) due to their
+\  very large slopes there.  See the tests in fixpt-mat-lib-tests.fs.
+\
+\  The sin function is based on Maclaurin series for sin and cos over
+\  the interval [0, pi/4], evaluated as polynomials with the Horner
+\  method.  This is extended to all angles using (anti)symmetry.  Cos is
+\  calculated from sin with cos(x) = sin(x+90), and tan is calculated as
+\  sin/cos.
+\
+\  Atan is based on the first 7 terms of its Euler series over the
+\  interval [0, 1/8].  It is extended to [0, 1] using the identity
+\
+\   atan(x) = atan(c) + atan((x-c)/(1+x*c)), c = 1/8, 2/8, ..., 7/8, 1.
+\
+\  For x>1 we use atan(x) = 90 - atan(1/x).  Negative arguments are handled
+\  by antisymmetry.  Asin and acos are calculated using the formulas
+\
+\    asin(x) = atan(x / sqrt(1 - x^2)),  x^2 <= 1/2
+\
+\    asin(x) = 90 - atan(sqrt(1 - x^2) / x),  x^2 > 1/2
+\
+\    acos(x) = 90 - asin(x)
+\
+\  The square root is calculated bitwise with a standard algorithm over
+\  the interval [0, 1] and is extended to all positive x by division by 4
+\  until the quotient is in [0, 1].
+\
+\ ------------- Comments on the log and power functions -------------------
+\
+\  The user can check for accuracy by running the test functions in the
+\  file fixpt-math-lib-tests.fs, or by running tests tailored to their use.
+\  Generally the functions are accurate when rounded to about 7 significant
+\  digits.  However, the user should not expect good accuracy when dealing
+\  with very small fractional values due to the limitations of fixed
+\  point.  In particular, this affects the values of the power and
+\  exponential functions for larger negative inputs, when the relative
+\  accuracy decreases significantly.
+\
+\  If the argument to a log function is non-positive, the function returns
+\  "minus infinity," the largest negative s31.32 value.  This is the only
+\  signal that an invalid input has been used.  Large negative inputs
+\  to the power and exponential functions will return zero.  Large positive
+\  inputs will return "plus infinity," the largest positive s31.32 value.
+\  The code shows the specific values used to determine "large" in each
+\  case.
+\
+\  The algorithm for calculating the base 2 log is taken from pseudocode
+\  in the Wikipedia article "Binary logarithm" which is based on:
+\
+\     Majithia, J. C.; Levan, D. (1973), "A note on base-2 logarithm
+\     computations", Proceedings of the IEEE, 61 (10): 1519–1520,
+\     doi:10.1109/PROC.1973.9318
+\
+\  The log10(x) and natural logarithm ln(x) make use of the identities
+\
+\     log10(x) = log10(2)*log2(x), ln(x) = ln(2)*log2(x)
+\
+\  where log10(2) and ln(2) are given constants.
+\
+\  The pow2(x) = 2^x function is calculated as 2^x = (2^z)*(2^n) where
+\  x = z + n, n is an integer with n <= x < n+1, and 0 <= z < 1.  The
+\  factor 2^z is calculated by the identity 2^z = exp(ln(2)*z) where
+\  exp(y) is calculated using its Maclaurin series.  The other factor
+\  is accounted for by shifting 2^z n times (shift left for n > 0, shift
+\  right for n < 0).
+\
+\  The pow10(x) = 10^x function is calculated using the identity
+\
+\               10^x = 2^(x*ln(10)/ln(2))
+\
+\  except for positive integer values of x, where simple multiplication
+\  is used.
+\
+\  The exp(y) function is calculated using the series above if y is
+\  between -0.36 and +0.36.  Otherwise it is calculated from pow2 using the
+\  identity exp(y) = pow2(y/ln(2)).
+\
+\ -------------------------------------------------------------------------
+\  Note:  Some s31.32 constant values were rounded from theoretical values
+\         and entered below as (comma-part) integers rather calculating
+\         them using Forth conversions, which trucate.
+\
+\ -------------------------------------------------------------------------
+\  Andrew Palm
+\  2018.04.09
+\ =========================================================================
+
+
+\ -------------------------------------------------------------------------
+\  Misc. helper words, constants, and variables
+\ -------------------------------------------------------------------------
+\ Most positive and negative s31.32 values possible
+$FFFFFFFF $7FFFFFFF 2constant +inf  \ 2147483647,9999999999
+$0 $80000000 2constant -inf         \ 2147483648,0
+
+\ Return the floor of an s31.32 value df
+: floor ( df -- df ) nip 0 swap 2-foldable ;
+
+\ Convert an s31.32 angle df1 in degrees to an angle df2 in [0, 360)
+\ such that df1 = df2 + n*360 where n is an integer
+: deg0to360 ( df1 -- df2 )  360,0 d/mod 2drop 2dup d0< if 360,0 d+ then
+  2-foldable
+;
+
+\ Convert an s31.32 angle df1 in degrees to an angle df2 in [-90, 90)
+\ such that df1 = df2 + n*180 where n is an integer.  (For tan only.)
+: deg-90to90 ( df1 -- df2 )
+  180,0 d/mod 2drop
+  2dup 90,0 d< not if
+    180,0 d-
+  else
+    2dup -90,0 d< if
+      180,0 d+
+    then
+  then
+  2-foldable
+;
+
+\ From common directory of Mecrisp-Stellaris Forth 2.4.0
+: numbertable <builds does> swap 2 lshift + @ ;
+
+\ -------------------------------------------------------------------------
+\  Square root functions
+\ -------------------------------------------------------------------------
+: 0to1sqrt ( x -- sqrtx )
+  \ Take square root of s31.32 number x with x in interval [0, 1]
+  \ Special cases x = 0 and x = 1
+  2dup d0= if exit then
+  2dup 1,0 d= if exit then
+
+  swap    \ Put x in MSW of unsigned 64-bit integer u
+
+  \ Find square root of u as 64-bit unsigned int
+  0,0 2swap 1,0 30 lshift  \ Stack: ( res  u  bit )
+  \ Start value of bit is highest power of 4 <= u
+  begin 2over 2over du< while dshr dshr repeat
+
+  \ Do while bit not zero
+  begin 2dup 0,0 d<> while
+    2rot 2over 2over d+ 7 pick 7 pick du> not if  \ u >= res+bit ?
+      2rot 2over d- 2rot 2tuck d-    \ u = u - res - bit
+      2swap 2rot dshr 2over d+            \ res = (res >> 1) + bit
+    else
+      dshr    \ res = res >> 1
+    then
+    2-rot       \ Return stack to ( res u bit )
+    dshr dshr   \ bit = bit >> 2
+  repeat
+
+  \ Drop u and bit, res is s31.32 square root of x
+  2drop 2drop
+  2-foldable
+;
+
+: sqrt ( x -- sqrtx )
+  \ Find square root of non-negative s31.32 number x
+  \ If x in interval [0, 1], use 0to1sqrt
+  2dup 1,0 d> not if
+    0to1sqrt
+  else
+    \ Divide x by 4 until result is in interval [0, 1]
+    0,0 2swap   \ Init count of divides ndiv (use double for convenience)
+    begin 2dup 1,0 d> while
+      2swap 1,0 d+ 2swap    \ Incr count
+      dshr dshr             \ Divide by 4
+    repeat
+    0to1sqrt
+    2swap nip 0 do    \ ndiv consumed
+      dshl                  \ Multiply by 2 ndiv times
+    loop
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Helpers and constants for trig functions
+\ -------------------------------------------------------------------------
+: deg2rad ( deg -- rad )
+  \ Convert s31.32 in degress to s31.32 in radians
+  74961321 0 f*
+  2-foldable
+;
+
+: rad2deg ( rad -- deg )
+  \ Convert s31.32 in radians to s31.32 in degrees
+  1270363336 57 f*
+  2-foldable
+;
+
+\ pi/2 and pi/4 as s31.32 numbers (whole part first for retrieval with 2@)
+2451551556 1 2constant pi/2
+3373259426 0 2constant pi/4
+
+\ s31.32 comma parts of coefficients in Horner expression of 7-term series
+\ expansion of sine after an x is factored out.  The whole parts are 0 and
+\ are supplied in code.
+numbertable sin-coef
+   20452225 ,   \  1/(14*15)
+   27531842 ,   \  1/(12*13)
+   39045157 ,   \  1/(10*11)
+   59652324 ,   \  1/(8*9)
+  102261126 ,   \  1/(6*7)
+  214748365 ,   \  1/(4*5)
+  715827883 ,   \  1/(2*3)
+
+: half-q1-sin-rad  ( x -- sinx )
+  \ Sin(x) for x in first half of first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/4 and pi/4
+  2dup 2dup f*          \  x and x^2 on stack as dfs
+  \ Calculate Horner terms
+  -1,0   \ Starting Horner term is -1
+  7 0 do
+    \ Multiply last term by x^2 and coefficient, then add +1 or -1 to get
+    \ new term
+    2over f* i sin-coef 0 f* 0 1
+    i 2 mod 0= if d+ else d- then
+  loop
+  \ Last term is multiplied by x
+  2nip f*
+  2-foldable
+;
+
+\ s31.32 comma parts of coefficients in Horner expression of 8-term series
+\ expansion of cosine.  The whole parts are 0 and are supplied in code.
+numbertable cos-coef
+   17895697 ,   \  1/(15*16)
+   23598721 ,   \  1/(13*14)
+   32537631 ,   \  1/(11*12)
+   47721859 ,   \  1/(9*10)
+   76695845 ,   \  1/(7*8)
+  143165577 ,   \  1/(5*6)
+  357913941 ,   \  1/(3*4)
+ 2147483648 ,   \  1/2
+
+: half-q1-cos-rad  ( x -- cosx )
+  \ Cos(x) for x in first half of first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/4 and pi/4
+  2dup f*          \  x^2 on stack
+  \ Calculate Horner terms
+  1,0   \ Starting Horner term is 1
+  8 0 do
+    \ Multiply last term by x^2 and coefficient, then add +1 or -1 to get
+    \ new term
+    2over f* i cos-coef 0 f* 0 1
+    i 2 mod 0= if d- else d+ then
+  loop
+  2nip
+  2-foldable
+;
+
+: q1-sin-rad ( x -- sinx )
+  \ Sin(x) for x in first quadrant Q1 and its negative
+  \ x is a s31.32 angle in radians between -pi/2 and pi/2
+  2dup pi/4 d< if
+    half-q1-sin-rad
+  else
+    pi/2 2swap d- half-q1-cos-rad
+  then
+  \ Apply max/min limits
+  \ 2dup 1,0 d> if 2drop 1,0 exit then
+  \ 2dup -1,0 d< if 2drop -1,0 exit then
+  2-foldable
+;
+
+: q1toq4-sin ( x -- sinx )
+  \ Sin(x) for x in quadrants Q1 through Q4
+  \ x is a s31.32 angle in degrees between 0 and 360
+  2dup 270,0 d> if
+    360,0 d- deg2rad q1-sin-rad
+  else 2dup 90,0 d> if
+    180,0 d- deg2rad q1-sin-rad dnegate
+  else
+    deg2rad q1-sin-rad
+  then then
+  2-foldable
+;
+
+\ s31.32 comma parts of coefficients in Horner expression of 6-term Euler
+\ expansion of atan after x/(x^2+1) is factored out.  The whole parts are
+\ 0 and are supplied in code.  The series variable is y = (x^2)/(x^2+1).
+numbertable atan-coef
+  3964585196 ,    \   12/13
+  3904515724 ,    \   10/11
+  3817748708 ,    \   8/9
+  3681400539 ,    \   6/7
+  3435973837 ,    \   4/5
+  2863311531 ,    \   2/3
+
+: base-ivl-atan ( x -- atanx )
+  \ Calc atan for s32.31 x in base interval 0 to 1/8.
+  2dup 2dup f* 2dup 1,0 d+     \ Stack: ( x  x^2  x^2+1 )
+  2rot 2swap f/                \ Stack: ( x^2  x/(x^2+1) )
+  2swap 2dup 1,0 d+ f/         \ Stack: ( x/(x^2+1)  (x^2)/(x^2+1) )
+  \ Calc Horner terms for powers of y = (x^2)/(x^2+1)
+  1,0   \ Starting Horner term is 1
+  6 0 do
+    \ Multiply last term by y and coefficient, then add 1 to get new term
+    2over f* i atan-coef 0 f* 1,0 d+
+  loop
+  \ Last term is multiplied by x/(x^2+1)
+  2nip f*
+  2-foldable
+;
+
+\ Table of atan(i/8), i = 0, 1, ..., 8, values in radians
+\ Only comma parts given, all whole parts are 0.
+numbertable atan-table
+           0 ,
+   534100635 ,
+  1052175346 ,
+  1540908296 ,
+  1991351318 ,
+  2399165791 ,
+  2763816217 ,
+  3087351340 ,
+  3373259426 ,
+
+: 0to1-atan ( x -- atanx )
+  \ Calc atan for s31.32 x in interval [0, 1]
+  2dup 1,0 d= if
+    2drop
+    8 atan-table 0
+  else
+    \ Find interval [i/8, (i+1)/8) containing x, then use formula
+    \ atan(x) = atan(i/8) + atan((x - (i/8))/(1 + (x*i/8))) where
+    \ the argument in the second term is in [0, 1/8].
+    0 7 do
+      0 i 8,0 f/ 2over 2over d< not if
+        2over 2over d-
+        2-rot f* 1,0 d+
+        f/ base-ivl-atan
+        i atan-table 0 d+
+        leave
+      else
+        2drop
+      then
+    -1 +loop
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Trig functions
+\ -------------------------------------------------------------------------
+: sin ( x -- sinx )
+  \ x is any s31.32 angle in degrees
+  2dup 2dup d0< if dabs then
+  \ Stack is ( x |x| )
+  360,0 ud/mod 2drop
+  q1toq4-sin    \ sin|x|
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  2-foldable
+;
+
+: cos ( x -- cosx )
+  \ x is any s31.32 angle in degrees
+  90,0 d+ sin
+  2-foldable
+;
+
+: tan ( x -- tanx )
+  \ x is any s31.32 angle in degrees
+  \ Move x to equivalent value in [-90, 90)
+  deg-90to90
+  \ If |x| > 89,9 deg, use approximation sgn(x)(180/pi)/(90-|x|)
+  2dup dabs 2dup 89,8 d> if
+    90,0 2swap d- 608135817 3 f* 180,0 2swap f/
+    2swap d0< if dnegate then
+  else
+    2drop 2dup sin 2swap cos f/
+  then
+  2-foldable
+;
+
+: atan ( x -- atanx )
+  \ Calc atan for s31.32 x, return result in degrees
+  2dup 2dup d0< if dabs then   \ Stack: ( x |x| )
+  \ Find atan(|x|)
+  2dup 1,0 d> if
+    \ |x| > 1, use atan(|x|) = (pi/2) - atan(1/|x|) with 1/|x| in [0, 1]
+    1,0 2swap f/ 0to1-atan pi/2 2swap d-
+  else
+    \ |x| <= 1
+    0to1-atan
+  then
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  rad2deg
+  2-foldable
+;
+
+: asin ( x -- asinx )
+  \ Calc asin for s31.32 x in interval [-1, 1], return result in degrees
+  2dup 2dup d0< if dabs then
+  \ Stack is ( x |x| )
+  2dup 1,0 d> if drop exit then     \ Exit if |x|>1 with x on stack
+  2dup 2dup f* 1,0 2swap d- 0to1sqrt    \ Stack: ( x  |x|  sqrt(1-x^2) )
+  2over 2dup f* 0,5 d> if           \ x^2 > (1/2) ?
+    2swap f/ atan 90,0 2swap d-
+  else
+    f/ atan
+  then
+  \ Negate if x is negative
+  2swap d0< if dnegate then
+  2-foldable
+;
+
+: acos ( x -- acosx )
+  \ Calc acos for s31.32 x in interval [-1, 1], return result in degrees
+  90,0 2swap asin d-
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Helper for logarithmic functions
+\ -------------------------------------------------------------------------
+: log2-1to2 ( y -- log2y )
+  \ Helper function that requires y is s31.32 value with 1 <= y < 2
+  0 0 2swap 0
+  ( retval y cum_m )
+  \ while((cum_m < 33) && (y > 1))
+  begin dup 2over
+    ( retval y cum_m cum_m y )
+    1,0 d> swap 33 < and while
+    ( retval y cum_m )
+    rot rot 0 -rot        \ m = 0, z = y
+    ( retval cum_m m z)
+    \ Do z = z*z, m = m+1 until 2 <= z.  We also get z < 4
+    begin
+      2dup f* rot 1 + -rot
+      ( retval cum_m m z )
+      2dup 2,0 d< not
+    until
+    \ At this point z = y^(2^m) so that log2(y) = (2^(-m))*log2(z)
+    \ = (2^(-m))*(1 + log2(z/2)) and 1 <= z/2 < 2
+    \ We will add m to cum_m and add 2*(-cum_m) to the returned value,
+    \ then iterate with a new y = z/2
+    ( retval cum_m m z )
+    2swap + -rot dshr 2>r   \ cum_m = cum_m + m, y = z/2
+    ( retval cum_m ) ( R: y=z/2 )
+    \ retval = retval + 2^-cum_m
+    1,0 2 pick 0 do dshr loop
+    ( retval cum_m 2^-cum_m )
+    rot >r d+
+    ( retval ) ( R: y cum_m )
+    r> 2r> rot
+    ( retval y cum_m )
+  repeat
+  drop 2drop
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Logarithmic functions
+\ -------------------------------------------------------------------------
+: log2 ( x -- log2x )
+  \ Calculates base 2 logarithm of positive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  \ Find the n such that 1 <= (2^(-n))*x < 2
+  \ This n is the integer part (characteristic) of log2(x)
+  0 -rot
+  ( n=0 y=x )
+  2dup 1,0 d> if
+    \ Do n = n+1, y = y/2 while (y >= 2)
+    begin 2dup 2,0 d< not while
+      ( n y )
+      dshr rot 1 + -rot
+    repeat
+  else
+    \ Do n = n-1, y = 2*y while (y < 1)
+    begin 2dup 1,0 d< while
+      ( n y )
+      dshl rot 1 - -rot
+    repeat
+  then
+
+  \ Now y = (2^(-n))*x so log2(x) = n + log2(y) and we use the
+  \ helper function to get log2(y) since 1 <= y < 2
+  log2-1to2 rot 0 swap d+
+  ( log2x )
+  2-foldable
+;
+
+1292913986 0 2constant log10of2
+
+: log10 ( x -- log10x )
+  \ Calculates base 10 logarithm of positive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  \ Find the n such that 1 <= (10^(-n))*x < 10
+  \ This n is the integer part (characteristic) of log2(x)
+  0 -rot
+  ( n=0 y=x )
+  2dup 1,0 d> if
+    \ Do n = n+1, y = y/10 while (y >= 10)
+    begin 2dup 10,0 d< not while
+      ( n y )
+      10,0 f/ rot 1 + -rot
+    repeat
+  else
+    \ Do n = n-1, y = 10*y while (y < 1)
+    begin 2dup 1,0 d<  while
+      ( n y )
+      10,0 f* rot 1 - -rot
+    repeat
+  then
+
+  \ Now y = (10^(-n))*x so log10(x) = n + log10(y) and we use the
+  \ identity log10(y) = log10(2)*log2(y)
+  log2 log10of2 f* rot 0 swap d+
+  ( log10x )
+  2-foldable
+;
+
+2977044472 0 2constant lnof2
+
+: ln ( x -- lnx )
+  \ Return the natural logarithm of a postive s31.32 value x
+
+  \ Treat error and special cases
+  \ Check that x > 0.  If not, return "minus infinity"
+  2dup 0,0 d> not if 2drop -inf exit then
+  \ If x = 1, return 0
+  2dup 1,0 d= if 2drop 0,0 exit then
+
+  log2 lnof2 f*
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+\  Power functions
+\ -------------------------------------------------------------------------
+\ s31.32 comma parts of all but first coefficient in Horner expansion of
+\ a partial sum of the series expansion of exp(x).  The whole parts are 0
+\ and are supplied in code.
+numbertable exp-coef
+   390451572 ,   \  1/11
+   429496730 ,   \  1/10
+   477218588 ,   \  1/9
+   536870912 ,   \  1/8
+   615366757 ,   \  1/7
+   715827883 ,   \  1/6
+   858993459 ,   \  1/5
+  1073741824 ,   \  1/4
+  1431655765 ,   \  1/3
+  2147483648 ,   \  1/2
+
+: exp-1to1 ( x -- expx )
+  \ Calculate exp(x) for x an s31.32 value.  Values are correct when
+  \ when rounded to six decimal places when x is between +/-0.7.  Uses an
+  \ 11-term partial sum evaluated using Horner's method.
+  \ Calculate Horner terms
+  1,0   \ Starting Horner term is 1
+  10 0 do
+    \ Multiply last term by x and coefficient, then add to get new term
+    2over f* i exp-coef 0 f* 0 1 d+
+  loop
+  \ Last part of expansion
+  2over f* 0 1 d+
+  2nip
+  2-foldable
+;
+
+: pow2 ( x -- 2^x )
+  \ Return 2 raised to the power x where x is s31.32
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ If x < -32, 0 is returned.  If x >= 31, returns s31.32 ceiling
+  2dup -32,0 d< if 2drop 0,0 exit then
+  2dup 31,0 d< not if 2drop +inf exit then
+  \ Get largest integer n such that n <= x so x = z + n, 0 <= z < 1
+  2dup floor 2swap 2over d-
+  ( n z )
+  \ Get exp(z*ln2) = 2^z, then shift n times to get 2^x = (2^n)*(2^z)
+  lnof2 f* exp-1to1 2swap nip
+  ( 2^z n )  \ n now a single
+  dup 0= if
+    drop
+  else
+    dup 0< if
+      negate 0 do dshr loop
+    else
+      0 do dshl loop
+    then
+  then
+  2-foldable
+;
+
+1901360723 1 2constant 1overlnof2
+
+: exp ( x -- expx )
+  \ Return the exponential e^x of the s31.32 value x
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ Return s31.32 ceiling for large pos. exponents, 0 for large neg.
+  2dup 21,5 d> if 2drop +inf exit then
+  2dup -22,2 d< if 2drop 0,0 exit then
+  \ If |x| < 0.36, use exponential series approximation
+  \ Otherwise, use exp(x) = pow2(x/ln(2))
+  2dup dabs 0,36 d< if
+    exp-1to1
+  else
+    1overlnof2 f* pow2
+  then
+  2-foldable
+;
+
+1382670639 3 2constant ln10overln2
+
+: pow10 ( x -- 10^x )
+  \ Return 10 raised to the power x where x is s31.32
+  \ If x is 0, return 1
+  2dup 0,0 d= if 2drop 1,0 exit then
+  \ Return s31.32 ceiling for large pos. exponents, 0 for large neg.
+  2dup 9,35 d> if 2drop +inf exit then
+  2dup -9,64 d< if 2drop 0,0 exit then
+  \ If x is a positive integer generate powers of 10 with multiplications
+  \ Otherwise use 10^x = 2^(x*ln(10)/ln(2))
+  2dup 2dup floor d= if
+    2dup 0,0 d> if
+      1,0 2swap nip
+      0 do 10,0 f* loop
+    else
+      ln10overln2 f* pow2
+    then
+  else
+    ln10overln2 f* pow2
+  then
+  2-foldable
+;
+
+\ -------------------------------------------------------------------------
+
+: s>f ( n -- f ) 0 swap  1-foldable ; \ Signed integer --> Fixpoint s31.32
+: f>s ( f -- n ) nip     2-foldable ; \ Fixpoint s31.32 --> Signed integer
+
+\ -----------------------------------------------------------------------------
+\   A few tools for dictionary wizardy
+\ -----------------------------------------------------------------------------
+
+: executablelocation? ( addr -- ? )
+  dup  addrinram?              \ In RAM
+  over flashvar-here u< and     \ and below the variables and buffers
+  swap addrinflash? or           \ or in flash ?
+;
+
+: link>flags ( addr -- addr* ) 4 + ;
+: link>name  ( addr -- addr* ) 8 + ;
+: link>code  ( addr -- addr* ) 8 + skipstring ;
+
+0 variable searching-for
+0 variable closest-found
+
+: code>link  ( entrypoint -- addr | 0 ) \ Try to find this code start address in dictionary
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+    dup link>code searching-for @ = if dup closest-found ! then
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  closest-found @
+;
+
+: inside-code>link ( addr-inside -- addr | 0 ) \ Try to find this address inside of a definition
+
+  dup executablelocation? not if drop 0 exit then  \ Do not try to find locations which are not executable
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+
+    dup link>code searching-for @ u<=
+    if \ Is the address of this entry BEFORE the address which is to be found ?
+      \ Distance to current   Latest best distance
+      searching-for @ over -  searching-for @ closest-found @ -  <
+      if dup closest-found ! then \ Is the current entry closer to the address which is to be found ?
+    then
+
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  \ Do not cross RAM/Flash borders:
+
+  searching-for @ addrinflash?
+  closest-found @ addrinflash? xor if 0 else closest-found @ then
+;
+
+: traceinside. ( addr -- )
+  inside-code>link if
+  ." ( "                 closest-found @ link>code   hex.
+  ." + " searching-for @ closest-found @ link>code - hex.
+  ." ) "
+  closest-found @ link>name ctype
+  then
+;
+
+: variable>link  ( location -- addr | 0 ) \ Try to find this variable or buffer in dictionary
+
+    searching-for !
+  0 closest-found !
+
+  compiletoram? 0= >r  \ Save current compile mode
+  compiletoram          \ Always scan in compiletoram mode, in order to also find definitions in RAM.
+
+  dictionarystart
+  begin
+
+    dup link>flags @ \ Fetch Flags of current definition
+
+    $7FFFFFF0 and \ Snip off visibility bit and alloted size field
+    dup $140 = swap $80 = or \ "Buffer" or "Ramallot"
+    if
+      dup link>code execute searching-for @ = if dup closest-found ! then
+    then
+
+    dictionarynext
+  until
+  drop
+
+  r> if compiletoflash then \ Restore compile mode
+
+  closest-found @
+;
+
+: variable-name. ( addr -- ) \ Print the name of this variable or buffer, if possible
+  variable>link ?dup if link>name ctype then
+;
+
+\ RISC-V 32 IMC Emulator, Copyright (C) 2020  Matthias Koch
+\ This is free software under GNU General Public License v3.
+
+\ Requires disassembler-rv32imc.
+
+\ -----------------------------------------------------------------------------
+\  Emulator infrastructure
+\ -----------------------------------------------------------------------------
+
+32 cells buffer: registers
+32 cells buffer: registers-previous
+
+: rs1@ ( -- x ) inst 15 rshift $1F and dup if cells registers + @ then ;
+: rs2@ ( -- x ) inst 20 rshift $1F and dup if cells registers + @ then ;
+: rd!  ( x -- ) inst  7 rshift $1F and dup if cells registers + ! else 2drop then ;
+
+\ -----------------------------------------------------------------------------
+\  Emulator logic
+\ -----------------------------------------------------------------------------
+
+: execute-load ( -- )
+  funct3
+  case
+    0 of rs1@ imm_i + c@signed rd! endof  \ lb
+    1 of rs1@ imm_i + h@signed rd! endof  \ lh
+    2 of rs1@ imm_i +  @       rd! endof  \ lw
+    4 of rs1@ imm_i + c@       rd! endof  \ lbu
+    5 of rs1@ imm_i + h@       rd! endof  \ lhu
+  endcase
+;
+
+: execute-immediate ( -- )
+  funct3
+  case
+    0 of rs1@ imm_i               + rd! endof       \ addi
+    1 of rs1@ imm_i          lshift rd! endof       \ slli
+    2 of rs1@ imm_i             slt rd! endof       \ slti
+    3 of rs1@ imm_i            sltu rd! endof       \ sltiu
+    4 of rs1@ imm_i             xor rd! endof       \ xori
+    5 of inst 26 rshift 16 = if
+         rs1@ imm_i $1F and arshift rd! else        \ srai
+         rs1@ imm_i          rshift rd! then endof  \ srli
+    6 of rs1@ imm_i              or rd! endof       \ ori
+    7 of rs1@ imm_i             and rd! endof       \ andi
+  endcase
+;
+
+: execute-auipc ( -- )
+  disasm-$ @ imm_u + rd!
+;
+
+: execute-store ( -- )
+  funct3
+  case
+    0 of rs2@ rs1@ imm_s + c! endof  \ sb
+    1 of rs2@ rs1@ imm_s + h! endof  \ sh
+    2 of rs2@ rs1@ imm_s +  ! endof  \ sw
+  endcase
+;
+
+: mulhsu ( x1 x2 -- x )
+[
+  $0004A783 ,  \ lw     x15, 0 (x9)
+  $00448493 ,  \ addi   x9, x9, 4
+  $0287A433 ,  \ mulhsu x8, x15, x8
+] inline 2-foldable ;
+
+: execute-register ( -- )
+  funct7 1 = \ Multiplication & Division RV32M
+  if
+    funct3
+    case
+      0 of rs1@ rs2@     *      rd! endof  \ mul
+      1 of rs1@ rs2@    m*  nip rd! endof  \ mulh
+      2 of rs1@ rs2@ mulhsu     rd! endof  \ mulhsu
+      3 of rs1@ rs2@   um*  nip rd! endof  \ mulhu
+      4 of rs1@ rs2@  /         rd! endof  \ div
+      5 of rs1@ rs2@ u/mod  nip rd! endof  \ divu
+      6 of rs1@ rs2@  /mod drop rd! endof  \ rem
+      7 of rs1@ rs2@ u/mod drop rd! endof  \ remu
+    endcase
+  else
+    funct3
+    case
+      0 of funct7 32 = if
+           rs1@ rs2@       - rd! else         \ sub
+           rs1@ rs2@       + rd! then endof   \ add
+      1 of rs1@ rs2@  lshift rd! endof        \ sll
+      2 of rs1@ rs2@     slt rd! endof        \ slt
+      3 of rs1@ rs2@    sltu rd! endof        \ sltu
+      4 of rs1@ rs2@     xor rd! endof        \ xor
+      5 of funct7 32 = if
+           rs1@ rs2@ arshift rd! else         \ sra
+           rs1@ rs2@  rshift rd! then endof   \ srl
+      6 of rs1@ rs2@      or rd! endof        \ or
+      7 of rs1@ rs2@     and rd! endof        \ and
+    endcase
+  then
+;
+
+: execute-lui ( -- )
+  imm_u rd!
+;
+
+: execute-branch ( -- )
+  funct3
+  case
+    0 of rs1@ rs2@   = if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ beq
+    1 of rs1@ rs2@  <> if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bne
+    4 of rs1@ rs2@   < if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ blt
+    5 of rs1@ rs2@  >= if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bge
+    6 of rs1@ rs2@  u< if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bltu
+    7 of rs1@ rs2@ u>= if imm_sb disasm-$ +! else 4 disasm-$ +! then endof \ bgeu
+  endcase
+;
+
+: execute-jalr ( -- )
+  disasm-$ @ 4 + rd!
+  rs1@ imm_i + disasm-$ !
+;
+
+: execute-jal ( -- )
+  disasm-$ @ 4 + rd!
+  imm_uj disasm-$ +!
+;
+
+: execute-ecall ( -- ) \ Dies ist nur für die Linux-Variante wichtig, um Syscalls abfangen zu können.
+
+  registers 17 cells + @ 64 =
+  if
+    registers 11 cells + @ @ emit
+    exit
+  then
+
+  registers 17 cells + @ 63 =
+  if
+    key registers 11 cells + @ !
+    exit
+  then
+
+;
+
+\ -----------------------------------------------------------------------------
+\   Extensions for executing compressed instructions
+\ -----------------------------------------------------------------------------
+
+: crs1@  ( -- x ) rvc-inst 7 rshift  $7 and 8 + cells registers + @ ;
+: crs2@  ( -- x ) rvc-inst 2 rshift  $7 and 8 + cells registers + @ ;
+: crd1!  ( x -- ) rvc-inst 7 rshift  $7 and 8 + cells registers + ! ;
+: crd2!  ( x -- ) rvc-inst 2 rshift  $7 and 8 + cells registers + ! ;
+
+: crs1l@ ( -- x ) rvc-inst 7 rshift $1F and     cells registers + @ ;
+: crs2l@ ( -- x ) rvc-inst 2 rshift $1F and     cells registers + @ ;
+: crdl!  ( x -- ) rvc-inst 7 rshift $1F and     cells registers + ! ;
+
+: execute-compressed ( -- )
+    rvc-inst 3 and
+    case
+      %00 of
+            rvc-func3
+            case
+              %000 of rvc-inst 0= if                               else       \ c.illegal
+                      2 cells registers + @  imm_addi4spn +  crd2! then endof \ c.addi4spn
+
+              %010 of       crs1@ imm_clwsw + @ crd2!  endof \ c.lw
+              %110 of crs2@ crs1@ imm_clwsw + !        endof \ c.sw
+              \ ." Unknown compressed quadrant 0 opcode"
+            endcase
+            2 disasm-$ +!
+          endof
+
+      %01 of
+            rvc-func3
+            case
+              %000 of crs1l@ imm_c + crdl!  2 disasm-$ +! endof \ c.addi
+              %010 of        imm_c   crdl!  2 disasm-$ +! endof \ c.li
+
+              %110 of crs1@ 0=  if imm_cb else 2 then disasm-$ +! endof \ c.beqz
+              %111 of crs1@ 0<> if imm_cb else 2 then disasm-$ +! endof \ c.bnez
+
+              %001 of disasm-$ @ 2 +  1 cells registers + !  imm_cj disasm-$ +! endof \ c.jal
+              %101 of                                        imm_cj disasm-$ +! endof \ c.j
+
+              %011 of rvc-inst 7 rshift $1F and 2 =
+                      if   2 cells registers + @  imm_addi16sp +  crdl!  \ c.addi16sp
+                      else                        imm_c 12 lshift crdl!  \ c.lui
+                      then
+                      2 disasm-$ +!
+                   endof
+
+              %100 of
+                     rvc-inst $0C00 and $0000 = if crs1@ imm_cu  rshift crd1! then \ c.srli
+                     rvc-inst $0C00 and $0400 = if crs1@ imm_cu arshift crd1! then \ c.srai
+                     rvc-inst $0C00 and $0800 = if crs1@ imm_c      and crd1! then \ c.andi
+                     rvc-inst $1C00 and $0C00 =
+                     if
+                       rvc-inst 5 rshift 3 and
+                       case
+                         %00 of crs1@ crs2@   - crd1! endof \ c.sub
+                         %01 of crs1@ crs2@ xor crd1! endof \ c.xor
+                         %10 of crs1@ crs2@  or crd1! endof \ c.or
+                         %11 of crs1@ crs2@ and crd1! endof \ c.and
+                       endcase
+                     then
+                     2 disasm-$ +!
+                   endof
+
+              2 disasm-$ +! \ ." Unknown compressed quadrant 1 opcode"
+            endcase
+          endof
+
+      %10 of
+            rvc-func3
+            case
+              %000 of crs1l@ imm_cu lshift crdl!                        2 disasm-$ +! endof \ c.slli
+              %010 of        2 cells registers + @  imm_csl + @  crdl!  2 disasm-$ +! endof \ c.lwsp
+              %110 of crs2l@ 2 cells registers + @  imm_css + !         2 disasm-$ +! endof \ c.swsp
+
+              %100 of
+                     rvc-inst $1000 and
+                     if
+                       rvc-inst 2 rshift $3FF and 0=
+                       if
+                         2 disasm-$ +! \ c.ebreak
+                       else
+                         rvc-inst 2 rshift $1F and 0=
+                         if   disasm-$ @ 2 +  1 cells registers + !  crs1l@ disasm-$ ! \ c.jalr
+                         else crs1l@ crs2l@ + crdl! 2 disasm-$ +!                      \ c.add
+                         then
+                       then
+                     else
+                       rvc-inst 2 rshift $1F and 0=
+                       if   crs1l@ disasm-$ !           \ c.jr
+                       else crs2l@ crdl! 2 disasm-$ +!  \ c.mv
+                       then
+                     then
+                   endof
+
+              2 disasm-$ +! \ ." Unknown compressed quadrant 2 opcode"
+            endcase
+          endof
+    endcase
+;
+
+
+\ -----------------------------------------------------------------------------
+\   Single step instruction set emulator
+\ -----------------------------------------------------------------------------
+
+: execute-step ( -- ) \ Executes one machine instruction and advances disasm-$
+
+  inst 3 and 3 <> if execute-compressed exit then \ Compressed Opcodes
+
+  inst $7F and
+  case
+    $03 of execute-load      4 disasm-$ +! endof
+    $13 of execute-immediate 4 disasm-$ +! endof
+    $17 of execute-auipc     4 disasm-$ +! endof
+    $23 of execute-store     4 disasm-$ +! endof
+    $33 of execute-register  4 disasm-$ +! endof
+    $37 of execute-lui       4 disasm-$ +! endof
+    $63 of execute-branch    endof
+    $67 of execute-jalr      endof
+    $6F of execute-jal       endof
+    $73 of execute-ecall     4 disasm-$ +! endof \ Emulate ECALL in emit and key.
+
+    4 disasm-$ +! \ Skip unknown opcodes
+  endcase
+;
+
+
+\ -----------------------------------------------------------------------------
+\  ANSI Escape Codes For Colourful Emissions
+\ -----------------------------------------------------------------------------
+
+: u.base10 ( u -- ) base @ decimal swap 0 <# #s #> type base ! ;
+: ESC[ ( -- ) 27 emit 91 emit ;
+: at-xy ( column row -- ) 1+ swap 2* 1+ swap ESC[ u.base10 ." ;" u.base10 ." H" ;
+: page ESC[ ." 2J" 0 0 at-xy ;
+
+: hide-cursor esc[ ." ?25l" ;
+: show-cursor esc[ ." ?25h" ;
+
+: default  ( -- ) ESC[ ." 0m"  ;
+: bold     ( -- ) ESC[ ." 1m"  ;
+
+: black    ( -- ) ESC[ ." 30m" ;
+: red      ( -- ) ESC[ ." 31m" ;
+: green    ( -- ) ESC[ ." 32m" ;
+: yellow   ( -- ) ESC[ ." 33m" ;
+: blue     ( -- ) ESC[ ." 34m" ;
+: magenta  ( -- ) ESC[ ." 35m" ;
+: cyan     ( -- ) ESC[ ." 36m" ;
+: white    ( -- ) ESC[ ." 37m" ;
+
+: rgb      ( -- ) ESC[ ." 38;2;" rot u.base10 ." ;" swap u.base10 ." ;" u.base10 ." m" ;
+
+\ -----------------------------------------------------------------------------
+\  Printing of register contents
+\ -----------------------------------------------------------------------------
+
+: register.r ( x -- )
+  >r
+  r@ 1 >= r@ 9 <= and if space space then
+  r@ 10 >= if space then
+  r> register.
+;
+
+: printregs ( -- )
+
+  base @
+
+  32 0 do
+    i 7 and 0= if cr then
+    i register.r space
+    i cells registers + @
+      dup i cells registers-previous + @ = if blue else red then
+      dup $5A5A5A5A = if default then
+    hex.
+    default
+  loop
+  cr cr
+
+  disasm-$ @ disasm-step disasm-$ ! \ Disassemble current Instruction
+
+  registers registers-previous 32 cells move
+
+  base !
+;
+
+\ -----------------------------------------------------------------------------
+\  Run a definition in emulator
+\ -----------------------------------------------------------------------------
+
+\ The emulator executes instructions which may alter the stacks.
+\ But the execution of the emulator requires stack access, too !
+\ Therefore, the emulator switches the hardware stacks to spare locations before.
+
+256 cells buffer: emu-stack
+256 cells buffer: emu-rstack
+
+false variable emulator-verbose
+
+: run-emulator ( -- )
+
+  \ -----------------------------------------------------------
+  \ Vorbereiten des Emulators für den Lauf mit dieser Definition
+
+  registers 32 cells $5A fill \ Alle Register im Emulator vorbelegen, um Fehler leichter sehen zu können
+
+          0 registers 0 cells + !  \ x0=zero
+  $DEADBEEF registers 1 cells + !  \ x1=lr auf einen magischen Rücksprungwert setzen
+        rp@ registers 2 cells + !  \ x2 bekommt den Returnstackpointer übergeben
+
+                                   \ Noch einen Zauber mit (do) und (unloop) machen, wie im Multitasker, damit die Schleifen übernommen werden können ?
+
+            registers 8 cells + !  \ TOS bereitlegen
+        sp@ registers 9 cells + !  \ Und den Datenstackpointer verdrahten.
+
+        \ Der Rest sind alles temporäre Register... Die braucht der Emulator nicht.
+
+  registers registers-previous 32 cells move
+
+  \ -----------------------------------------------------------
+  \ Der Emulator selbst benötigt nun neue Stacks, weil die emulierte Definition die "normalen" Stacks weiterbenutzt.
+
+  emu-stack  256 cells + sp!
+  emu-rstack 256 cells + rp!
+
+  \ -----------------------------------------------------------
+  \ Ausführen der gewünschten Definition im Emulator
+  begin
+    emulator-verbose @ if printregs then
+    execute-step
+    disasm-$ @ $DEADBEEF = \ Irgendwann wird die Definition zurückkehren, und dann den magischen Wert, der am Anfang in LR war, in PC laden.
+  until
+
+  \ -----------------------------------------------------------
+  \ Rückholen der veränderten Register aus dem Emulator:
+
+  registers 9 cells + @ sp! \ Datenstackpointer zurückholen
+  registers 8 cells + @     \ TOS zurückholen
+
+                            \ Noch einen Zauber mit (do) und (unloop) machen, wie im Multitasker, damit die Schleifen übernommen werden können ?
+
+  registers 2 cells + @ rp! \ Returnstackpointer zurückholen
+;
+
+
+: step        ( -- ) ' disasm-$ ! cr true  emulator-verbose ! run-emulator ;
+: step-silent ( -- ) ' disasm-$ ! cr false emulator-verbose ! run-emulator ;
+
+\ -----------------------------------------------------------------------------
+
+: forget ( -- ) \ Usage: forget name, but it will work on definitions in RAM only.
+  ' code>link dup addrinram?
+  if
+    dup @ (latest) !
+    (dp) !
+  else drop then
+;
+
+: del ( -- ) \ Remove the latest definition in RAM.
+  (latest) @ addrinram?
+  if
+    (latest) @ (dp) !
+    (latest) @ @ (latest) !
+  then
+;
+
+: Flamingo cr
+  ."      _" cr
+  ."     ^-)" cr
+  ."      (.._          .._" cr
+  ."       \`\\        (\`\\        (" cr
+  ."        |>         ) |>        |)" cr
+  ." ______/|________ (7 |` ______\|/_______a:f" cr
+;
+
+: welcome ( -- )
+  cr
+  Flamingo
+  cr
+  ." Have a nice day !" cr
+;
+
+\ A convenient memory dump helper
+
+: u.4 ( u -- ) 0 <# # # # # #> type ;
+: u.2 ( u -- ) 0 <# # # #> type ;
+
+: dump16 ( addr -- ) \ Print 16 bytes memory
+  base @ >r hex
+  $F bic
+  dup hex. ." :  "
+
+  dup 16 + over do
+    i c@ u.2 space \ Print data with 2 digits
+    i $F and 7 = if 2 spaces then
+  loop
+
+  ."  | "
+
+  dup 16 + swap do
+        i c@ 32 u>= i c@ 127 u< and if i c@ emit else [char] . emit then
+        i $F and 7 = if 2 spaces then
+      loop
+
+  ."  |" cr
+  r> base !
+;
+
+: dump ( addr len -- ) \ Print a memory region
+  cr
+  over 15 and if 16 + then \ One more line if not aligned on 16
+  begin
+    swap ( len addr )
+    dup dump16
+    16 + ( len addr+16 )
+    swap 16 - ( addr+16 len-16 )
+    dup 0<
+  until
+  2drop
+;
+
+$40000010 constant porta-in
+$40000020 constant porta-out
+$40000040 constant porta-dir
+$40000080 constant leds-out
+
+$40000100 constant portb-in
+$40000200 constant portb-out
+$40000400 constant portb-dir
+$40000800 constant buttons
+
+$40001000 constant oled-in
+$40002000 constant oled-out
+$40004000 constant oled-dir
+$40008000 constant analog-out
+
+$40100000 constant adc-in
+$40200000 constant adc-out
+$40400000 constant sd-in
+$40800000 constant sd-out
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: leds ( x -- ) leds-out ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 40000 * delay-ticks ;
+: us ( u -- )    40 * delay-ticks ;
+
+: random ( -- x ) 0 32 0 do 10 us 2* buttons @ 6 rshift or loop ;
+
+[ifdef] init
+  : init ( -- ) init welcome ;
+[else]
+  : init ( -- )      welcome ;
+[then]

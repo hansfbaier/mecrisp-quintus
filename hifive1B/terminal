@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ -n "$1" ]
+then
+    n=$1
+else
+    n=115200
+fi
+
+
+picocom -b $n /dev/ttyACM0 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 250 -c 10 -n"

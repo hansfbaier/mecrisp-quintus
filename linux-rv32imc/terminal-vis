@@ -1,0 +1,5 @@
+#!/bin/bash
+
+stty -icanon -echo
+qemu-riscv32-static mecrisp-quintus-linux-rv32imc-vis
+stty sane

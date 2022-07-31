@@ -1,0 +1,27 @@
+
+Flashing of the HiFive1, simple way:
+
+../toolchain/openocd-hifive1 -f flash-hifive1.cfg
+
+Open terminal:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 250 -n"
+
+
+Different, much more complicated method for flashing:
+
+If you have the very large freedom-e-sdk installed, you can flash Mecrisp-Quintus this way:
+(https://github.com/sifive/freedom-e-sdk)
+
+In one terminal:
+  cd freedom-e-sdk
+  make run_openocd
+
+In another terminal:
+  cd freedom-e-sdk
+  make run_gdb
+
+    monitor flash protect 0 64 last off
+    load mecrisp-quintus-0.4-experimental/hifive1/mecrisp-quintus-hifive1-with-disassembler.hex
+    jump *0x20400000
+

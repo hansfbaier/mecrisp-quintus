@@ -1,0 +1,89 @@
+
+\ -----------------------------------------------------------------------------
+
+\ Light intensity measurement with a LED on digital IO pins.
+
+\ Take care: Leakage currents can heavily influence the measurement.
+\ Tiny currents ! Keep tracks clean and place board on a good insulator.
+\ The LED has a junction capacitance in the 10-20 pF range, therefore, use short wires.
+
+\ You can check for leakage currents:
+\ Let this run without LED connected, it should print constant measurement of 375000 if you are not limited by leakage.
+\ The lower the value, the worse is your electrical condition.
+
+\ You can increase sensitivity by increasing the termination value in the darkness loop.
+
+\ -----------------------------------------------------------------------------
+
+\ Bits  7 -  0: PMOD
+\ Bits 15 -  8: Header 1
+\ Bits 23 - 16: Header 2
+
+$400020 constant port-in
+$400040 constant port-out
+$400080 constant port-dir
+
+\  Pinout and board layout:
+\
+\         /--------------------------------------
+\        /                 Header 1:  76543210-+
+\       /            ________              ++
+\      /            |        |      R      --
+\  [USB]  FT        |  FPGA  |    R G R    73   Ir
+\  [USB]  DI        |        |      R      62   DA
+\      \            |________|             51
+\       \                                  40
+\        \                 Header 2:  01234567-+
+\         \--------------------------------------
+\
+\    Numbers are bit numbers
+\    + is 3.3 V   - is GND
+\    G Green LED  R Red LEDs
+
+\ -----------------------------------------------------------------------------
+
+ 1 constant Anode    \ PMOD connector, pin 0
+16 constant Cathode   \                pin 4
+
+: darkness ( -- u )
+
+  Anode Cathode or port-dir ! \ Set anode and cathode as output
+        Cathode    port-out ! \ Anode low, cathode high
+
+  \ Wait a little bit to charge the junction capacitance to rail voltage
+  10 0 do loop
+
+  Anode            port-dir ! \ Set cathode as input
+
+  0
+  begin
+    port-in @ Cathode and  \ Is cathode discharged due to photocurrent ?
+  while
+    1+
+    \ Terminate when a maximum value is reached to gurantee end of the measurement in absolute darkness
+    dup 25000 u>= if exit then
+  repeat
+
+  \ A short flash to visualise the duration of the measurement
+
+  Anode Cathode or port-dir ! \ Set anode and cathode as output
+  Anode            port-out ! \ Anode high, cathode low
+  100000 0 do loop
+                 0 port-out ! \ Off.
+;
+
+\ -----------------------------------------------------------------------------
+
+: printdarkness ( -- ) cr
+
+  Anode Cathode or port-dir ! \ Set anode and cathode as output
+  Anode            port-out ! \ Anode high, cathode low
+
+  10000000 0 do loop \ Shiny welcome message.
+
+  begin
+    0  15 0 do darkness + loop   . cr  \ Average of 15 measurements to reduce noise
+  key? until
+;
+
+printdarkness

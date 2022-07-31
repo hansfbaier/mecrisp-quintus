@@ -1,0 +1,7 @@
+#!/bin/bash
+
+rm -f build/*
+
+yosys -q -p "synth_ice40 -top icebreaker -json build/icebreaker.json -blif build/icebreaker.blif -dsp -relut -abc2" ice40up5k_spram.v icebreaker.v uart-fifo.v spimemio.v picosoc.v picorv32.v
+nextpnr-ice40 --freq 12 --up5k --package sg48 --asc build/icebreaker.asc --pcf icebreaker.pcf --json build/icebreaker.json --force --pcf-allow-unconstrained
+icepack build/icebreaker.asc icebreaker.bin

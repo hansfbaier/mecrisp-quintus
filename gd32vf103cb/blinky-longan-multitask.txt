@@ -1,0 +1,61 @@
+
+\ Let it shine !
+
+\ Requires mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin or mecrisp-quintus-gd32vf103cb-with-acrobatics.bin
+
+: ms ( u -- ) 8000 * delay-ticks ; \ For 8 MHz
+
+task: blink-red
+
+: blink-red& ( -- )
+
+  $44444224 PORTA_CRL ! \ Set PA1 and PA2 as output
+  $44244444 PORTC_CRH ! \ Set PC13 as output
+
+  blink-red activate
+    begin
+      1 13 lshift PORTC_ODR bic!
+      100 ms
+      1 13 lshift PORTC_ODR bis!
+      220 ms
+    again
+;
+
+task: blink-green
+
+: blink-green& ( -- )
+
+  $44444224 PORTA_CRL ! \ Set PA1 and PA2 as output
+  $44244444 PORTC_CRH ! \ Set PC13 as output
+
+  blink-green activate
+    begin
+      %10 PORTA_ODR bic!
+      200 ms
+      %10 PORTA_ODR bis!
+      320 ms
+    again
+;
+
+task: blink-blue
+
+: blink-blue& ( -- )
+
+  $44444224 PORTA_CRL ! \ Set PA1 and PA2 as output
+  $44244444 PORTC_CRH ! \ Set PC13 as output
+
+  blink-blue activate
+    begin
+      %100 PORTA_ODR bic!
+      300 ms
+      %100 PORTA_ODR bis!
+      540 ms
+    again
+;
+
+: blinky ( -- )
+  multitask
+  blink-red&
+  blink-green&
+  blink-blue&
+;

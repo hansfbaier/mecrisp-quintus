@@ -1,0 +1,294 @@
+\ spi0-soft.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+
+\ Programming SPI connection in software for later use with the
+\ TFT-display that comes with the longan nano (gd32vf103bc)
+
+\ This software SPI0 raises the ability to read from the ST7735S.
+\ Be aware that for this purpose tft-basics.txt must be load (tft-init).
+
+
+  \ | 3/4-line-SPI  |    <c>    |           | 4-line SPI |         |          |                  |
+  \ |---------------+-----------+-----------+------------+---------+----------+------------------|
+  \ | Signal name   |  Connec-  | Connec-   | Signal     | Portpin | SPI      | Testing          |
+  \ | in            |  tor pin  | tor pin   | name       |         | standard | Oszillos-        |
+  \ |               |           | name      |            |         | name     | cope             |
+  \ | schematic     | schematic | schematic | Datasheet  |         |          |                  |
+  \ |---------------+-----------+-----------+------------+---------+----------+------------------|
+  \ | Backlight_2V8 |     1     | LEDA      |            |         |          |                  |
+  \ | GND           |     2     | GND       |            |         |          |                  |
+  \ | TFT_RST       |     3     | RESET     |            | GD_PB1  |          |                  |
+  \ | TFT_RS        |     4     | RS        | D/CX       | GD_PB0  |          | blue             |
+  \ | TFT_SDA       |     5     | SDA       | SDA        | GD_PA7  | MOSI     | black            |
+  \ | TFT_SCL       |     6     | SCL       | SCL        | GD_PA5  | SCKL     | red              |
+  \ | 3V3           |     7     | VDD       |            |         |          |                  |
+  \ | TFT_CS        |     8     | CS        | CSX        | GD_PB2  | CS       | nicht rausgefüht |
+  \ | --            |     9     | PAD       |            |         |          |                  |
+  \ | --            |    10     | PAD       |            |         |          |                  |
+  \ \
+  \ *MISO not used
+  \ \
+
+
+
+\ The table below says it: We have to switch between MTB and MRB modes to send (MTB)
+\ or to recieve (MRB) datas.
+\
+\ | <5>   | <26>                       | <18>               | <20>                 |
+\ |-------+----------------------------+--------------------+----------------------|
+\ | MTU   | Master transmission with   | MSTMOD = 1         | MOSI: Transmission   |
+\ |       | unidirectional connection  | RO = 0             | MISO: Not used       |
+\ |       |                            | BDEN = 0           |                      |
+\ |       |                            | BDOEN: Don’t care  |                      |
+\ |-------+----------------------------+--------------------+----------------------|
+\ | MRU   | Master reception with      | MSTMOD = 1         | MOSI: Not used       |
+\ |       | unidirectional connection  | RO = 1             | MISO: Reception      |
+\ |       |                            | BDEN = 0           |                      |
+\ |       |                            | BDOEN: Don’t care  |                      |
+\ |-------+----------------------------+--------------------+----------------------|
+\ | MTB   | Master transmission with   | MSTMOD = 1         | MOSI: Transmission   |
+\ |       | bidirectional connection   | RO = 0             | MISO: Not used       |
+\ |       |                            | BDEN = 1           |                      |
+\ |       |                            | BDOEN = 1          |                      |
+\ |-------+----------------------------+--------------------+----------------------|
+\ | MRB   | Master reception with      | MSTMOD = 1         | MOSI: Reception      |
+\ |       | bidirectional connection   | RO = 0             | MISO: Not used       |
+\ |       |                            | BDEN = 1           |                      |
+\ |       |                            | BDOEN = 0          |                      |
+\ |-------+----------------------------+--------------------+----------------------|
+
+
+
+\ 4-line Serial Protocol (for RDID1/RDID2/RDID3/0Ah/0Bh/0Ch/0Dh/0Eh/0Fh Command: 8-bit Read):
+\ 4-line Serial Protocol (for RDDID Command: 24-bit Read)
+\ 4-line Serial Protocol (for RDDST Command: 32-bit Read)
+
+
+
+\ -----------------------------------------------------------------------------------------
+\ ------------ some registers we need ----------------------------------------------------
+\ -----------------------------------------------------------------------------------------
+
+
+ $40010000               Constant APB2_BUS_BASE  
+APB2_BUS_BASE $00000800 + Constant GPIO_BASE
+  GPIO_BASE $00000000 + Constant GPIOA  
+GPIO_BASE $00000400 + Constant GPIOB
+
+
+GPIOA   0 + Constant GPIOA_CTL0
+GPIOA   8 + Constant GPIOA_ISTAT
+ GPIOA $10 + Constant GPIOA_BOP
+ GPIOA $14 + Constant GPIOA_BC
+
+
+GPIOB   0 + Constant GPIOB_CTL0
+ GPIOB $10 + Constant GPIOB_BOP
+ GPIOB $14 + Constant GPIOB_BC
+
+
+\ -----------------------------------------------------------------------------------------
+\ ----------- init SPI in software --------------------------------------------------------
+\ -----------------------------------------------------------------------------------------
+
+
+: init-gpios ( -- )
+      ( output mode push-pull 50MHz )
+      $F0F00000 GPIOA_CTL0  bic! \ clear pins 5, 7
+      $30300000 GPIOA_CTL0  bis! \ set pins 5, 7
+      ( output mode push-pull 50MHz )
+      $00000FFF GPIOB_CTL0  bic! \ clear pins 0-2
+      $00000333 GPIOB_CTL0  bis! \ set pins 0-2
+;
+      
+
+
+\ ------------------- oled defines (c) in forth ------------------------
+\ ------------------- set and clear bits -------------------------------
+
+
+\ To switch the portpins high-low we use the BC and BOC registers.
+\ They work 'atomar' and we don't have to care about the other bits
+\ in the OCD-registers. 
+
+
+\ Pin B2 selects the TFT
+\ deselct TFT
+: -tft-cs ( -- )  %100 GPIOB_BC bis! ;
+
+\ select TFT
+: +tft-cs ( -- )  %100 GPIOB_BOP bis! ;
+
+\ -tft-rst RESET the TFT driver chip 
+: -tft-rst ( -- )   %10 GPIOB_BC bis! ;
+
+\ +tft-rst awake the TFT driver chip 
+: +tft-rst ( -- )   %10 GPIOB_BOP bis! ;
+
+\ The DC-line decides if a value is handled as data or registeraddress
+\ -tft-dc i.e registeraddress
+: -tft-dc ( -- )    %1 GPIOB_BC bis! ; \ DC PB0    
+
+\ +tft-dc i.e. data
+: +tft-dc ( -- )    %1 GPIOB_BOP bis! ; \ DC PB0        
+
+
+: -tft-sclk ( -- )  1 5 lshift GPIOA_BC bis! ;     \ CLK PA5
+: +tft-sclk ( -- )  1 5 lshift GPIOA_BOP bis! ;
+: -tft-sdin ( -- )  1 7 lshift GPIOA_BC bis! ;    \ DIN PA7
+: +tft-sdin ( -- )  1 7 lshift GPIOA_BOP bis! ;
+: tft-sdin? ( -- f ) GPIOA_ISTAT @ 7 rshift 1 and ; 
+\ ----------------------------------------------------------
+
+: tft-sdin-output ( -- )       \ TFT_SDA
+    $F0000000 GPIOA_CTL0  bic! \ clear pin 7
+    $30000000 GPIOA_CTL0  bis! \ set pin  7
+;
+
+: tft-sdin-input ( -- )        \ TFT_SDA
+    $F0000000 GPIOA_CTL0  bic! \ clear pin 7
+    $40000000 GPIOA_CTL0  bis! \ set pin  7
+;
+
+\ -------------- SPI Kommunikation -------------------------
+
+: dummy-clock ( -- )
+    -tft-sclk
+    +tft-sclk
+;
+
+: send ( n -- )
+     tft-sdin-output
+    -tft-cs
+    8 0 DO
+        dup
+        -tft-sclk
+        %10000000 and 
+        IF +tft-sdin
+        ELSE -tft-sdin
+        THEN
+        1 lshift
+        +tft-sclk
+    LOOP
+    drop
+;
+
+: read ( x -- n ... nx )
+     dup 1 <>
+    IF dummy-clock THEN
+    tft-sdin-input
+    0 ?DO
+    0
+    8 0 DO
+        -tft-sclk
+        1 ms
+        tft-sdin? +
+        1 lshift
+        +tft-sclk
+    LOOP
+    2/
+    \ dup . 
+    \ base @ 2 base ! swap
+    \ s>d <# bl hold # # # # [char] . hold
+    \ # # # # bl hold #> type
+    \ base !
+    LOOP
+;
+
+
+: raw-byte>tft ( n -- n )
+    send +tft-cs 0 ; 
+
+: byte>tft ( n -- )
+    +tft-dc
+    raw-byte>tft drop
+;
+
+: 2bytes>tft ( n -- )
+    +tft-dc
+    $100 /mod \ ???  swap
+    raw-byte>tft drop
+    raw-byte>tft drop
+;
+
+: tft-reg ( n -- )
+    -tft-dc
+    raw-byte>tft drop
+;
+
+
+true Constant spi0-conf-ok?
+: spi0-init ( -- )
+    init-gpios
+; 
+
+
+\ 4-line Serial Protocol (for RDID1/RDID2/RDID3/0Ah/0Bh/0Ch/0Dh/0Eh/0Fh Command: 8-bit Read):
+\ 4-line Serial Protocol (for RDDID Command: 24-bit Read)
+\ 4-line Serial Protocol (for RDDST Command: 32-bit Read)
+
+ : RDID1 ( -- n )      \ Read Display ID1 \ should be $7C
+     -tft-dc $da send
+     1 read 
+ ;
+
+ : RDID2 ( -- n )      \ Read Display ID2 \ should be in range $80 - $FF
+     -tft-dc $db send
+     1 read
+ ;
+
+ : RDID3 ( -- n )      \ Read Display ID3  ß can be Changed by WRID3 $D2 p 157
+     -tft-dc $dc send
+     1 read
+ ;
+ 
+ : RDDPM ( -- n )      \ Read Display  Power Mode
+     -tft-dc $0A send
+     1 read
+ ;
+ 
+ : RDDMACDTL ( -- n )      \ Read Display MADCTL
+     -tft-dc $0B send
+     1 read
+ ;
+ 
+ : RDDCOLMOD ( -- n )      \ Read Display Pixel Format
+     -tft-dc $0C send
+     1 read
+ ;
+ 
+ : RDDIM ( -- n )      \ Read Display Image Mode
+     -tft-dc $0D send
+     1 read
+ ;
+ 
+ : RDDSM ( -- n )      \ Read Display Signal Mode
+     -tft-dc $0E send
+     1 read
+ ;
+ 
+ : RDDSDR ( -- n )      \ Read Display Self Diagnostic REsult
+     -tft-dc $0F send
+     1 read
+ ;
+ 
+ : RDDID ( -- n n n )      \ Read Display ID
+     -tft-dc $04 send
+     3 read
+ ;
+ 
+ : RDDST ( -- n n n )      \ Read Display Status
+     -tft-dc $09 send
+     4 read
+ ;
+
+ 
+ : RAMRD ( -- n )       \ Read Data
+     -tft-dc $2e send
+     1 read
+ ;
+ 

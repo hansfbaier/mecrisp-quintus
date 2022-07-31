@@ -1,0 +1,38 @@
+\ tft-ram-simple-suite.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+
+\ loads selected files into RAM
+\ you have to choose which parts of the suite you want
+\ because all together dosn't fit into ram memory
+
+
+compiletoram
+
+#include  ms.fs \ essential for spi0 and 104mhz
+\ flamingo and init are invoked during compilation of
+\ 104-init 
+: Flamingo ; \ Dummy essential for 104mhz
+: init ;     \ Dummy essential for 104mhz
+#include  gd32vf103-104mhz.fs  \ convenience
+104-init
+
+#include  spi0-hard.txt  \ essential for tft-basics
+#include  xy-hard.txt    \ essential for tft-basics
+#include  tft-basics.txt \ essential
+
+\ use simple-graphics
+#include tft-simple-graphics.txt   
+#include graphics-unicode-8x16.txt  \ he who says a must also say b
+
+tft-init
+
+: show-german-umlaute ( -- )
+ s" >ÄÖÜäöüß<" 14 50 drawstring ;
+
+demo
+show-german-umlaute
+

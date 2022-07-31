@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# With disassembler and math
+
+stty -icanon -echo
+
+{
+   echo -e "compiletoflash\n"
+   cat ../common/conditional.txt
+   cat ../common/disassembler-rv32imc.txt
+   cat ../common/fixpt-math-lib.fs
+   cat ../common/dictionary-tools.txt
+   cat save.txt
+   echo -e "save\" mecrisp-quintus-linux-rv32imc-with-disassembler-and-math\"\n"
+   echo -e "bye\n"
+   # cat -
+} | qemu-riscv32-static mecrisp-quintus-linux-rv32imc
+
+# With acrobatics, disassembler and math
+
+{
+   echo -e "compiletoflash\n"
+   cat ../common/conditional.txt
+   cat ../common/acrobatics.txt
+   cat ../common/disassembler-rv32imc.txt
+   cat ../common/fixpt-math-lib.fs
+   cat ../common/dictionary-tools.txt
+   cat save.txt
+   echo -e "save\" mecrisp-quintus-linux-rv32imc-with-acrobatics-disassembler-and-math\"\n"
+   echo -e "bye\n"
+   # cat -
+} | qemu-riscv32-static mecrisp-quintus-linux-rv32imc
+
+# With VIS
+
+stty -icanon -echo
+
+{
+   echo -e "compiletoflash\n"
+   cat ../common/VIS/vis-0.8.4-mecrisp-quintus.fs
+   echo -e "compiletoflash\n"
+   cat ../common/VIS/vis-disassembler-rv32imc.fs
+   echo -e "compiletoram\n"
+   cat save.txt
+   echo -e "save\" mecrisp-quintus-linux-rv32imc-vis\"\n"
+   echo -e "bye\n"
+   # cat -
+} | qemu-riscv32-static mecrisp-quintus-linux-rv32imc
+
+stty sane
+
+echo -e ""

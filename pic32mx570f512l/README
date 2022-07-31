@@ -1,0 +1,54 @@
+
+This is the first MIPS M4K target of Mecrisp-Quintus.
+
+It runs on the official "PIC32MX1/2/5 Starter Kit" which has no debug terminal
+on board and contacts too tiny to reliably solder to.
+
+Therefore, it uses a bit-banged 9600 baud 8N1 over the pins of the push buttons
+RD6 (TX) and RD7 (RX) which can be soldered to.
+
+------------------\
+                  |
+                  |
+                  |
+   [SW1]    LED1  |
+  RD6=TXD         |
+                  |
+                  |
+    GND           |
+   [SW2]    LED2  |
+  RD7=RXD         |
+                  |
+                  |
+                  |
+   [SW3]    LED3  |
+                  |
+                  |
+                  |
+------------------/
+
+No joy, rather a proof-of-concept.
+
+Feel free to contact me about adding more PIC32 targets !
+
+
+
+
+I am on current stable Debian Linux, you'll get the toolchain with
+
+apt-get install binutils-mipsel-linux-gnu
+
+This should let you recreate the binary image included in the release. The assembler supports larger cores than M4K out of the box.
+
+So far, creating the Mecrisp-Quintus binaries must be doable with FOSS tools.
+It's not nice, but I hope it is ok to rely on vendor tools for flashing, if there is no other way.
+
+For flashing, I used "MPLAB Integrated Programming Environment (IPE)" which comes with the MPLAB-X installation.
+
+https://www.microchip.com/mplab/mplab-integrated-programming-environment
+https://www.microchip.com/mplab/mplab-x-ide
+
+I am very sorry I found no open source way yet to handle the on-board debugger of my demo board; bare chips can be flashed with a complete FOSS toolchain:
+
+https://blogs.fsfe.org/pboddie/?p=1654
+

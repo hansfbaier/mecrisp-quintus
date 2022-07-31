@@ -1,0 +1,16 @@
+
+Mecrisp-Quintus for running on Icestick containing FemtoSOC by Bruno Levy
+
+The Verilog files for Femtosoc and the FemtoRV32 processor are a contribution by Bruno Levy under BSD license.
+
+See https://github.com/BrunoLevy/learn-fpga
+
+
+How to install:
+
+iceprog femtosoc.bin
+iceprog -o 64k mecrisp-quintus-hx1k-with-disassembler.bin
+
+How to open a terminal:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 400 -c 3 -n"

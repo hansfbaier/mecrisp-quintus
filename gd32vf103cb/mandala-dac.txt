@@ -1,0 +1,65 @@
+
+\ Vector graphics artwork
+
+\ To be viewed with oscilloscope in XY mode on DAC pins A4 and A5.
+
+\ Needs acrobatics compiler and analog.txt
+
+\ ------------------------------------------------------------------------------
+
+maximum-inlining
+
+: putpixel ( x y -- ) swap 8 * $800 + swap 8 * $800 + dacs ; \ Bild in die Mitte legen
+
+normal-inlining
+
+\ ------------------------------------------------------------------------------
+
+-0,57735026918962584 dshr drop constant aint
+ 0,86602540378443871 dshr drop constant bint
+
+: zyklusmaler ( x-start y-start -- )
+
+  2dup 2>r \ Startpunkt zur Enderkennung auf den Returnstack
+
+  begin
+    ( x y )
+
+    swap over ( y   x   y  ) 2 lshift aint mulh 1+ 2/ + ( y  x' )
+    swap over ( x'  y   x' ) 2 lshift bint mulh 1+ 2/ + ( x' y' )
+    swap over ( y'  x'  y' ) 2 lshift aint mulh 1+ 2/ + ( y' x'' )
+
+    swap ( x'' y' )
+
+    2dup putpixel
+    2dup 2r@ d=
+  until
+
+  2drop 2rdrop
+
+;
+
+\ ------------------------------------------------------------------------------
+
+: blume ( -- )
+
+  72mhz init-dac
+
+  begin
+
+
+    0 0 0 $FFF line
+        0 $FFF $FFF $FFF line
+               $FFF $FFF $FFF 0 line
+                         $FFF 0 0 0 line
+
+    -64 -57 zyklusmaler \ 2028
+    -51  -7 zyklusmaler \ 676
+    -64 -36 zyklusmaler \ 510
+
+  \ -51 -30 zyklusmaler \ 132
+
+  key? until
+;
+
+\ blume

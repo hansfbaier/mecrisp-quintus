@@ -1,0 +1,32 @@
+
+\ -----------------------------------------------------------------------------
+\ A few examples for the RV32IM assembler
+\ -----------------------------------------------------------------------------
+
+\ Fast integer square root. Algorithm from the book "Hacker's Delight".
+
+: sqrt ( u -- u^1/2 )
+
+  _push x7
+
+    _li x15 $40000000
+    _li x14 0
+
+l-: _or x7 x15 x14
+    _srli x14 x14 1
+    _bltu x8 x7 +
+
+      _sub x8 x8 x7
+      _or x14 x14 x15
+
+l+: _srli x15 x15 2
+    _bne x15 zero -
+    _mv x8 x14
+
+  _pop x7
+
+  1-foldable
+;
+
+: sqr ( n -- n^2 ) _mul x8 x8 x8 1-foldable ;
+

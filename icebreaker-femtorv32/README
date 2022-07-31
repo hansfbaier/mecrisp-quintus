@@ -1,0 +1,34 @@
+
+How to install and use:
+
+iceprog icebreaker.bin
+iceprog -o 128k mecrisp-quintus-icebreaker-with-tools.bin
+./terminal
+
+Memory map:
+
+$00000000 - $0000FFFF: 64 kb RAM
+$00010000 - $0001FFFF: 64 kb RAM, containing mirrored Flash contents
+$00800000 - $008FFFFF: SPI Flash memory, slow.
+
+IO Registers:
+
+  $400010 constant port-in
+  $400020 constant port-out
+  $400040 constant port-dir
+  $400080 constant port-leds
+
+  $410000 constant uart-data
+  $420000 constant uart-status
+  $440000 constant ticks
+  $480000 constant reload
+
+The port-* registers have atomic clear/set/toggle capability:
+
+  Address +  0 : Normal write
+  Address +  4 : Clear bits
+  Address +  8 : Set bits
+  Address + 12 : Toggle bits
+
+The ticks counter counts up, triggers an interrupt on overflow and
+loads the value from the reload register, which defaults to 0.

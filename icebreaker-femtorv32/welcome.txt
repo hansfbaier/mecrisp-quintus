@@ -1,0 +1,34 @@
+
+$400010 constant port-in
+$400020 constant port-out
+$400040 constant port-dir
+$400080 constant port-leds
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: random ( -- x ) 0 32 0 do 2* port-in @ 24 rshift or loop ;
+
+: leds ( x -- ) port-leds ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 12000 * delay-ticks ;
+: us ( u -- )    12 * delay-ticks ;
+
+[ifdef] init
+  : init ( -- ) init welcome ;
+[else]
+  : init ( -- )      welcome ;
+[then]

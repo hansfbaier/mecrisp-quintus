@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mipsel-linux-gnu-as -o mecrisp-quintus-linux-mips.o mecrisp-quintus-linux-mips.s -march=m4k
+mipsel-linux-gnu-ld -T mecrisp.ld -z max-page-size=4096 -o mecrisp-quintus-linux-mips mecrisp-quintus-linux-mips.o
+mipsel-linux-gnu-objdump -Mnumeric -D mecrisp-quintus-linux-mips > mecrisp-quintus-linux-mips.list

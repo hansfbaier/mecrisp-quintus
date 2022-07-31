@@ -1,0 +1,49 @@
+
+$40000010 constant porta-in
+$40000020 constant porta-out
+$40000040 constant porta-dir
+$40000080 constant leds-out
+
+$40000100 constant portb-in
+$40000200 constant portb-out
+$40000400 constant portb-dir
+$40000800 constant buttons
+
+$40001000 constant oled-in
+$40002000 constant oled-out
+$40004000 constant oled-dir
+$40008000 constant analog-out
+
+$40100000 constant adc-in
+$40200000 constant adc-out
+$40400000 constant sd-in
+$40800000 constant sd-out
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: leds ( x -- ) leds-out ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 40000 * delay-ticks ;
+: us ( u -- )    40 * delay-ticks ;
+
+: random ( -- x ) 0 32 0 do 10 us 2* buttons @ 6 rshift or loop ;
+
+[ifdef] init
+  : init ( -- ) init welcome ;
+[else]
+  : init ( -- )      welcome ;
+[then]

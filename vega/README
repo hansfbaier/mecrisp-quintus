@@ -1,0 +1,66 @@
+
+Preview for a port to Open-Isa Vega Board with RM32M1
+
+
+How to prepare the board and flash Mecrisp-Quintus:
+
+First you need to set the special FOPT configuration register for booting the RI5CY core on Reset.
+
+Procedure is described in the Zephyr project docs (copied for convenience), but have a look yourself:
+https://docs.zephyrproject.org/latest/boards/riscv32/rv32m1_vega/doc/rv32m1_vega.html
+
+    In one terminal, use OpenOCD to connect to the board:
+
+    ~/rv32m1-openocd -f boards/riscv32/rv32m1_vega/support/openocd.cfg
+
+    The output should look like this:
+
+    $ ~/rv32m1-openocd -f boards/riscv32/rv32m1_vega/support/openocd.cfg
+    Open On-Chip Debugger 0.10.0+dev-00431-ge1ec3c7d (2018-10-31-07:29)
+    [...]
+    Info : Listening on port 3333 for gdb connections
+    Info : Listening on port 6666 for tcl connections
+    Info : Listening on port 4444 for telnet connections
+
+    In another terminal, connect to OpenOCD’s telnet server and execute the init and ri5cy_boot commands with the reset button on the board (at top left) pressed down:
+
+    $ telnet localhost 4444
+    Trying 127.0.0.1...
+    Connected to localhost.
+    Escape character is '^]'.
+    Open On-Chip Debugger
+    > init
+    > ri5cy_boot
+
+    The reset button is at top left, as shown in the following figure.
+
+The first step is necessary only once, you do not need to repeat it on every time you wish to reflash the board.
+All the tools are included in the vega/flashing folger; use rv32m1_ri5cy.cfg configuration file for the included OpenOCD.
+
+
+With the correct boot core selected, you can flash Mecrisp-Quintus to the Vega board:
+( Similar to Micropython description: https://github.com/AaronKel/micropython-vega )
+
+In one terminal:
+
+../toolchain/openocd-vega -f rv32m1_ri5cy.cfg
+
+In another terminal:
+
+telnet localhost 4444
+  program mecrisp-quintus-vega.bin
+  reset
+
+If you wish to use GDB instead (elf binary is not included for default):
+
+../toolchain/riscv32-unknown-elf-gdb mecrisp-quintus-vega.elf
+  target remote:3333
+  load
+  c
+
+If everything is fine, the RGB LED should shine in turqiouse colour.
+
+You can connect to the terminal with 9600 baud 8N1 half-duplex, as it is bit-banged for now.
+
+Flash driver for "compiletoflash" mode and LPUART0 initialisation shall follow soon.
+Contact me if you wish to help: m-atthias@users.sf.net

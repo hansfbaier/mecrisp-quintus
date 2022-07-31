@@ -1,0 +1,229 @@
+
+\ Ledcomm-Vega
+\   Connect LED with Anode (over optional 100 Ohms resistor) to PTB2 and with Cathode directly to PTB3.
+
+: Sendedatenholen ( -- Daten true | false ) key? if key dup emit true else false then ;
+: Datenempfangen  ( Daten -- ) emit ;
+: Verbindungsanfang ( -- ) ."  (Up) "      ; \ Verbindungsanzeige nach Bedarf anpassen
+: Verbindungsende   ( -- ) ."  (Down) " cr ;
+
+4 constant Anode
+8 constant Kathode
+
+: Strahle ( -- )
+  Anode Kathode or GPIOB PDDR + bis!
+  Anode            GPIOB PSOR + !
+  Kathode          GPIOB PCOR + !
+;
+
+: Lauschen-Vorbereitung ( -- )
+  Anode Kathode or GPIOB PDDR + bis!
+  Anode            GPIOB PCOR + ! \ Sperrschichtkapazität
+  Kathode          GPIOB PSOR + ! \ durch Verpolung laden
+
+  \ Warten, bis die Kathode geladen ist - das geht im ARM nicht durch Einlesen des Pins
+  10 0 do loop
+
+  Kathode GPIOB PDDR + bic!
+;
+
+: Lauschen-Nachbearbeitung ( -- Flag )
+  Kathode GPIOB PDIR + bit@ not \ Ist die Kathode entladen, ist es hell
+;
+
+
+34 constant Synchrondauer
+
+8 variable Strahlzaehler
+0 variable Verbindungsdauer
+0 variable Lauschzaehler
+0 variable Lichtmuster
+0 variable Sendedaten
+0 variable Datenregister
+
+true variable Zustand ( Hell oder Dunkel ? )
+ 244 variable Basiszeit ( in Mikrosekunden )
+
+: msb? ( x -- x Flag ) dup 0< ;
+
+: HolePuls ( -- )
+  8 Strahlzaehler ! \ Null-Puls, wird auch im Ruhezustand gesendet.
+
+  \ Verbindungsdauer prüfen, beginne erst zu Senden, wenn die Verbindung auch sicher besteht.
+  \ Belasse es im Falle einer gerade laufenden Synchronisation dabei, Ruhezustandspulse abzugeben.
+
+  Verbindungsdauer @ Synchrondauer <> if exit then
+
+  Sendedaten @ ?dup if  \ An bestehender Übertragung weiterarbeiten
+                      msb? if 4 Strahlzaehler ! then \ Eins-Puls erforderlich ?
+                      shl
+                      dup 0= if 12 Strahlzaehler ! then \ Wurde gerade die Merk-Eins herausrotiert ? Übertragungspuls !
+                      Sendedaten !
+                    else  \ Neue Daten holen und vorbereiten
+                      Sendedatenholen
+                      if
+                        ?dup if  ( Daten-zum-Senden )
+                               4 Strahlzaehler ! \ Bei neuen Daten ungleich Null wird die führende Eins gesendet
+
+                               msb? if \ Ist das MSB schon die führende Eins ?
+                                      shl 1 or \ Eine Merk-Eins reinrotieren, die nicht übertragen wird
+                                    else
+                                      shl 1 or \ Eine Merk-Eins reinrotieren, die nicht übertragen wird
+                                      begin
+                                        msb?   \ So lange schieben, bis die führende Eins herauspurzelt
+                                        swap shl swap
+                                      until
+                                    then
+
+                               Sendedaten ! \ Fertig geschobene Datenbits zum weiteren Senden bereitlegen
+                             else 12 Strahlzaehler ! \ Für eine Null genügt ein Übertragungspuls
+                             then
+                      then
+                    then
+;
+
+: Bitmustererkennung ( -- )
+  Verbindungsdauer @ Synchrondauer <>
+  if \ Verbindung besteht erst nach 18 mal Zublinkern stabil.
+    1 Verbindungsdauer +!
+    Verbindungsdauer @ Synchrondauer = if Verbindungsanfang then
+  then
+
+  Lichtmuster @
+      %1111111111100 and    \ Übertragungspuls wird mit 11 bis 14 Basiszeiten erkannt
+  dup %1111111111100 = if drop Datenregister @ Datenempfangen
+                             0 Datenregister ! \ Datenregister muss gelöscht werden,
+                       else                    \  da die Daten aus mit variabler Länge übertragen werden
+
+          %111111100 and    \ Null-Puls wird mit 7-10 Basiszeiten erkannt
+          %111111100 = if   Datenregister @ shl      Datenregister !
+                       else Datenregister @ shl 1 or Datenregister !
+                       then \ Eins-Puls wird mit 3-6 Basiszeiten erkannt.
+
+                       then
+;
+
+: Taktlauscher-init ( -- )
+  0 Sendedaten !     \ Keine Daten zum Herausrotieren und Abstrahlen ! Wichtig !
+  Verbindungsdauer @ Synchrondauer = if Verbindungsende then
+  0 Verbindungsdauer !
+
+  Zustand @ if
+    \ Für einen hellen Taktlauscher
+    HolePuls
+    Strahle
+  else
+    \ Für einen dunkelen Taktlauscher
+    0 Strahlzaehler !
+    1 Lauschzaehler !
+    Lauschen-Vorbereitung
+  then
+;
+
+: Taktlauscher ( -- )
+  Strahlzaehler @ ?dup
+  if \ Strahlzähler ist nicht Null
+    -1 Strahlzaehler +!
+    1- if
+         Strahle
+       else \ Gerade Null geworden
+         32 Lauschzaehler !
+         0 Lichtmuster !
+         Lauschen-Vorbereitung
+       then
+  else
+    Lauschen-Nachbearbeitung
+    1 and Lichtmuster @ shl or
+    dup Lichtmuster ! ( Neues-Lichtmuster )
+    %11111 and
+    %11100 = if
+               Bitmustererkennung
+               HolePuls
+               Strahle
+             else
+               -1 Lauschzaehler +!
+               Lauschzaehler @ if Lauschen-Vorbereitung
+                               else Taktlauscher-init then
+             then
+  then
+;
+
+\ -----------------------------------------------------------------------------
+
+: reset ( -- )  0 $4002A004 ! ; \ Trigger Reset by writing invalid value into Watchdog Count Register.
+
+\ $4002C204 constant SCG_SIRCDIV
+
+$40032000 constant LPTMR0_CSR \ Low Power Timer Control Status Register (CSR)
+$40032004 constant LPTMR0_PSR \ Low Power Timer Prescale Register (PSR)
+$40032008 constant LPTMR0_CMR \ Low Power Timer Compare Register (CMR)
+$4003200C constant LPTMR0_CNR \ Low Power Timer Counter Register (CNR)
+
+$E0041000 constant EVENT0_INTPTEN         \ Interrupt Enable Register (EVENT0_INTPTEN)
+$E0041004 constant EVENT0_INTPTPEND       \ Interrupt Pending Register (EVENT0_INTPTPEND)
+$E0041008 constant EVENT0_INTPTPENDSET    \ Set Interrupt Pending Register (EVENT0_INTPTPENDSET)
+$E004100C constant EVENT0_INTPTPENDCLEAR  \ Clear Interrupt Pending Register (EVENT0_INTPTPENDCLEAR)
+
+$4004F000 constant INTMUX0_CH0_CSR      \ RW Channel n Control Status Register (CH0_CSR)
+$4004F004 constant INTMUX0_CH0_VEC      \ RO Channel n Vector Number Register (CH0_VEC)
+$4004F010 constant INTMUX0_CH0_IER_31_0 \ RW Channel n Interrupt Enable Register (CH0_IER_31_0)
+$4004F020 constant INTMUX0_CH0_IPR_31_0 \ RO Channel n Interrupt Pending Register (CH0_IPR_31_0)
+
+$4002B13C constant PCC0_INTMUX
+
+: irq ( -- )
+  mcause $80000018 =
+  if
+    $80 LPTMR0_CSR bis! \ Clear pending interrupt flag of the timer
+    -1 EVENT0_INTPTPENDCLEAR ! \ Okay, handled the INTMUX0 channel (and all others, too).
+
+    Taktlauscher
+
+  else
+    unhandled
+  then
+;
+
+: timer-count ( -- u )
+  0 LPTMR0_CNR ! \ Dummy write to synchronise temporary register in hardware
+  LPTMR0_CNR @
+;
+
+\ -----------------------------------------------------------------------------
+
+: ledcomm ( -- )
+
+  $00000100 PORTB 2 cells + !
+  $00000100 PORTB 3 cells + !
+
+  Anode Kathode or GPIOB PCOR + !
+  Anode Kathode or GPIOB PDDR + bis!
+
+  Taktlauscher-init
+
+  \ Configure interrupt channel
+
+  ['] irq irq-collection !
+
+  $40000000 PCC0_INTMUX !           \ Enable clock for INTMUX
+  1 24 lshift EVENT0_INTPTEN !       \ Enable INTMUX Channel 0 as interrupt source
+  1  7 lshift INTMUX0_CH0_IER_31_0 !  \ INTMUX Input 7 is LPTMR0
+
+  \ Configure Timer for (8 / 32768) s = 244 us tick
+
+  \ $00020101 SCG_SIRCDIV ! \ 8 MHz /2 for SIRC3 = 4 MHz, all others on 8 MHz. Default is 8 MHz on all SIRC lanes.
+
+  1 LPTMR0_CSR bic! \ Disable timer
+
+    1952 LPTMR0_CMR ! \ 244 us * 8 MHz = 1952 Takte
+    4 LPTMR0_PSR !     \ Prescaler Bypass, use SIRC3 /1 = 8 MHz.
+    $40 LPTMR0_CSR !    \ Interrupt enable
+
+  1 LPTMR0_CSR bis! \ Enable timer
+
+  eint begin again
+;
+
+: bright ( -- ) true zustand ! ;
+: dark   ( -- ) false zustand ! ;
+

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Usage: buildcore quintusemu mecrisp-quintus-binary forth-source precompiled-binary
+
+{
+   echo -e "compiletoflash\n"
+   cat "$3"
+   echo -e "hex 00810000 DABBAD00 !\n"
+   # cat -
+} | "$1" "$2"
+
+echo -e ""
+
+mv coredump.bin "$4"

@@ -1,0 +1,43 @@
+
+
+$48020000 constant GPIOA
+$48020040 constant GPIOB
+$48020080 constant GPIOC
+$480200C0 constant GPIOD
+$4100F000 constant GPIOE
+
+$00 constant PDOR  \ Port Data Output Register (PDOR)
+$04 constant PSOR  \ Port Set Output Register (PSOR)
+$08 constant PCOR  \ Port Clear Output Register (PCOR)
+$0C constant PTOR  \ Port Toggle Output Register (PTOR)
+$10 constant PDIR  \ Port Data Input Register (PDIR)
+$14 constant PDDR  \ Port Data Direction Register (PDDR)
+
+$40046000 constant PORTA
+$40047000 constant PORTB
+$40048000 constant PORTC
+$40049000 constant PORTD
+$41037000 constant PORTE
+
+\ PCR registers: Example for setting PA22 as GPIO: $00000100 PORTA 22 cells + !
+
+: delay-ticks ( ticks -- ) \  Tick = 1 / 48 MHz = 20.83333 ns
+  cycles >r ( ticks R: start )
+  begin
+    pause
+    cycles r@ - ( ticks elapsed R: start )
+    over u>=
+  until
+  rdrop drop
+;
+
+: us ( us -- ) 48 * delay-ticks ;
+: ms ( ms -- ) 48000 * delay-ticks ;
+
+: cornerstone ( Name ) ( -- ) \ Mask $FFF for 4 kb sector size ($1000)
+  <builds begin here $FFF and while 0 , repeat
+  does>   begin dup  $FFF and while 4 + repeat
+          eraseflashfrom
+;
+
+cornerstone eraseflash

@@ -1,0 +1,10 @@
+
+Experimental SDRAM access on ULX3S.
+
+To try, flash bitstream and Forth image:
+
+openFPGALoader --board=ulx3s --write-flash ulx3s.bit
+openFPGALoader --board=ulx3s --write-flash -o 0x200000 --file-type bin mecrisp-quintus-ulx3s-with-tools.bin
+
+Open terminal with 115200 baud 8N1 and press the button labeled "PWR" next to the SDRAM to reset.
+

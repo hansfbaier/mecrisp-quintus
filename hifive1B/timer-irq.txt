@@ -1,0 +1,52 @@
+
+$10012000 constant GPIOBASE
+
+GPIOBASE $00 + constant GPIO_VALUE
+GPIOBASE $04 + constant GPIO_INPUT_EN
+GPIOBASE $08 + constant GPIO_OUTPUT_EN
+GPIOBASE $0C + constant GPIO_PORT
+GPIOBASE $10 + constant GPIO_PUE
+GPIOBASE $38 + constant GPIO_IOF_EN
+GPIOBASE $3C + constant GPIO_IOF_SEL
+GPIOBASE $40 + constant GPIO_OUT_XOR
+
+\ Common Anode tied to Vcc. LEDs shine on low.
+\   GPIO 19: Green LED
+\   GPIO 21: Blue LED
+\   GPIO 22: Red LED
+
+$02004000 constant mtimecmp
+
+32768 variable ticks-until-next-interrupt
+
+: next-irq ( ticks -- )
+  dint
+  0 mtime64 d+
+  swap mtimecmp 2! \ 64 bit register, but with little endian ordering. Forth 2! stores high part first, requiring a swap.
+  eint
+;
+
+: tick ( -- )
+
+  mcause $80000007 =
+  if
+    ticks-until-next-interrupt @ next-irq
+    1 19 lshift GPIO_PORT xor!
+  else
+    fault
+  then
+;
+
+: blinky-irq ( -- )
+
+  1 19 lshift
+  1 21 lshift or
+  1 22 lshift or GPIO_PORT !
+
+  1 19 lshift
+  1 21 lshift or
+  1 22 lshift or GPIO_OUTPUT_EN !
+
+  ['] tick irq-collection !
+  0 next-irq
+;

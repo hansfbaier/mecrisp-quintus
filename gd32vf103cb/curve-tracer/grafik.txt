@@ -1,0 +1,241 @@
+
+\ Der TFT-Grafiktreiber von Martin Bitter,
+\ zusammengestaucht auf einen einfachen Framebuffer.
+
+\ -----------------------------------------------------------------------------
+\   SPI-Treiber
+\ -----------------------------------------------------------------------------
+
+  $40010000                 Constant APB2_BUS_BASE
+  APB2_BUS_BASE $00000800 + Constant GPIO_BASE
+      GPIO_BASE $00000000 + Constant GPIOA
+      GPIO_BASE $00000400 + Constant GPIOB
+
+
+      GPIOA   0 + Constant GPIOA_CTL0
+      GPIOA $10 + Constant GPIOA_BOP
+      GPIOA $14 + Constant GPIOA_BC
+
+      GPIOB   0 + Constant GPIOB_CTL0
+      GPIOB $10 + Constant GPIOB_BOP
+      GPIOB $14 + Constant GPIOB_BC
+
+           $40021000 Constant RCU_BASE
+      RCU_BASE $18 + Constant RCU_APB2EN
+
+            $40013000 Constant SPI0_BASE
+            SPI0_BASE Constant SPI0_CTL0
+        SPI0_BASE 8 + Constant SPI0_STAT
+      SPI0_BASE $0c + Constant SPI0_DATA
+
+
+ \ PB2 = TFT_CS
+ : -tft-csx ( -- ) %100 GPIOB_BC  bis! ; \ deselect TFT
+ : +tft-csx ( -- ) %100 GPIOB_BOP bis! ;  \ select TFT
+
+ \  PB1 = TFT_RST
+ : -tft-rst ( -- ) %10 GPIOB_BC  bis! ; \ RESET the TFT driver chip
+ : +tft-rst ( -- ) %10 GPIOB_BOP bis! ; \ awake the TFT driver chip
+
+ \ The DC-line decides if a value is handled as data or registeraddress
+ \ PB0 = tft-d/cx
+  : -tft-d/cx ( -- ) %1 GPIOB_BC  bis! ; \ register
+  : +tft-d/cx ( -- ) %1 GPIOB_BOP bis! ; \ data
+
+  : spi0-config ( -- )
+      +tft-csx
+      %0010.0011.0100.1111 drop SPI0_CTL0 ! \ clk/4
+  ;
+
+  : spi0-init ( -- )
+      %1.0000.0000.0000 drop    \ enable SPI
+      %1                        \ enable alternate function
+      or RCU_APB2EN bis!        \ ins REGISTER
+      ( AF output mode push-pull 50MHz )
+      $F0F00000 GPIOA_CTL0  bic! \ clear pins 5, 7
+      $B0B00000 GPIOA_CTL0  bis! \ set pins 5, 7
+      ( output mode push-pull 50MHz )
+      $00000FFF GPIOB_CTL0  bic! \ clear pins 0-2
+      $00000333 GPIOB_CTL0  bis! \ set pins 0-2
+      spi0-config
+  ;
+
+  : spi0-conf-ok? ( -- f )
+      spi0_stat @ %100000 and \ get conf_error flag
+      %100000 <>
+  ;
+
+  : transmit? ( -- f )   \ transmitbuffer ready/empty?
+      spi0_stat @ %10 and \ get TBE flag
+      %10 =
+  ;
+
+  : receive? ( -- f ) \ recievebuffer ready/full?
+      spi0_stat @ 1 and 0<>
+  ;
+
+  : raw-byte>tft ( n -- n )
+      -tft-csx
+      \  BEGIN transmit?   UNTIL \ !!!***@@@///&&&%%%!!!
+      spi0_data h!
+      BEGIN receive? UNTIL
+      spi0_data h@   drop
+      +tft-csx
+  ;
+
+  : byte>tft ( n -- )
+      +tft-d/cx
+      raw-byte>tft
+  ;
+
+  : tft-reg ( n -- )
+      -tft-d/cx
+      raw-byte>tft
+  ;
+
+
+\ -----------------------------------------------------------------------------
+\   TFT-Treiber
+\ -----------------------------------------------------------------------------
+
+\ command: is a defining word. It generates commands send to the tft-driver
+\ chips. Use as follow: Put the number of parameters to be send after the
+\ command on stack, put the command (register) on stack. Then type
+\ command: NAME to create the new word NAME i.e. command  send to the tft.
+\ The naming is strictly orientated at the datasheet. I think of them as
+\ semi-primitives. Cave at! Parameter passing in reverse order.
+\ see: driver chip ST7735S_V1.5_20150303.pdf: pp 104
+
+
+: command: ( name ) ( parfn ... parf1 nb nf tft-reg -- )
+    <builds , \ register
+    h,       \ nb
+   does>
+    dup @ tft-reg 4 +
+     h@ 0 ?DO byte>tft LOOP
+   ;
+
+\ define write commands only. for reading see spi0-soft.txt
+
+   \ System function Commands
+   0 $01 command: swreset ( -- )
+   0 $10 command: slpin ( -- )   \ sleep in @ booster off
+   0 $11 command: spout ( -- )  \ sleep-out @ booster on
+   0 $12 command: ptlon ( -- )  \ partial mode on
+   0 $13 command: noron ( -- )  \ partial mode off (normal)
+   0 $20 command: invoff ( -- )  \ display inversion off (normal)
+   0 $21 command: invon ( -- )  \ display inversion on
+   1 $26 command: gamset  ( b -- ) \ gamma curve select
+   0 $28 command: dispoff ( -- )  \ display off
+   0 $29 command: dispon ( -- )  \ display on
+   4 $2A command: caset ( h-byte1 low-byte1 h-byte2 low-byte2 -- ) \ column address set
+   4 $2B command: raset ( h-byte1 low-byte1 h-byte2 low-byte2 -- ) \ row address set
+   0 $2c command: ramwr \ write meory i.e. start writing,
+   \                      all consecutive bytes must be send via byte>tft
+   \                      or 2bytes>tft (in my case this latter is used (16-bit pixel)
+ 128 $2D command: rgbset ( red_tone*$a0 green_tone*$b0 blue_tone*$a0 -- )  \ LUT for color display \ can't understand 128 ???
+   4 $30 command: ptlar ( h-byte1 low-byte1 h-byte2 low-byte2 -- )  \ partial start/end address set
+   6 $33 command: scrlar ( top-fixed-area height-scroll-area bottom-fixed-area -- ) \ scroll area set
+   0 $34 command: teoff ( -- ) \ tearing effect line off; not connectet with nano
+   1 $35 command: teon ( b -- ) \ tearing effect mode set & on; not connected with nano
+   1 $36 command: madctl ( b -- ) \ memory data access control
+   2 $37 command: vscsad ( b b -- ) \ scroll start address of RAM
+   0 $38 command: idmoff ( -- ) \ idle mode off
+   0 $39 command: idmon ( -- ) \ idle mode on
+   1 $3a command: colmode ( b -- ) \ color mode
+
+   \ Panel Function Commands
+   3 $b1 command: frmctr1 ( b b b  -- ) \ in normal mode
+   3 $b2 command: frmctr2 ( b b b -- ) \ in idle mode
+   6 $b3 command: frmctr3 ( b b b b b b -- ) \ in partial mode & full colors
+   1 $b4 command: invctr ( b -- ) \ display inversion control
+   3 $c0 command: pwctr1 ( b b b -- ) \ power contrl setting; GVDD voltage
+   1 $c1 command: pwctr2 ( b -- ) \ power control setting; VGH/VGL voltage
+   2 $c2 command: pwctr3 ( b b -- ) \ power control setting; in normal mode full colors; adjust amplifier & booster voltage
+   2 $c3 command: pwctr4 ( b b -- ) \ power control setting; in idle mode 8-colors; adjust amplifier & booster voltage
+   2 $c4 command: pwctr5 ( b b -- ) \ power control setting; in idle partial mode full colors; adjust amplifier & booster voltage
+   1 $c5 command: vmctr1 ( b -- ) \ VCOM control 1, voltage
+   1 $c7 command: vmofctr ( b -- ) \ set VCOM offset control ;  see: nvctr1-3
+   1 $d1 command: wrid2 ( b -- ) \ set LMC version code at ID2 (fixed?) see: nvctr1-3
+   1 $d2 command: wrid3 ( b -- ) \ set customer project code at ID3 (fixed?)  see: nvctr1-3
+   \ Note 2: The D9h, Deh and DFh registers are used for NV Memory function controller. (Ex: write, clear, etc.)
+   1 $d9 command: nvctr1 ( b -- ) \ NVM control status; must be supplied with external 7.5V
+   2 $de command: nvctr2 ( b b -- ) \ NVM read command; b1=F5 b2=A5 action code .i.e don't read something via SPI?
+   2 $df command: nvctr3 ( b b -- ) \ NVM write command; b=A5 action code
+   16 $e0 command: gamctrp1 ( b1 .. b16 ) \ set gamma adjustment +polarity
+   16 $e1 command: gamctrn1 ( b1 .. b16 ) \ set gamma adjustment -polarity
+   1 $fc command: gcv ( b -- ) \ gate clock varaible
+
+   \ end of semi-primitives now starting high-level
+
+\ The values for the initial commands came from https://github.com/sipeed/Longan_GD32VF_examples.
+
+: tft-init ( -- )
+
+  spi0-init
+  spi0-conf-ok? 0= if ." SPI initialisation failed." cr exit then
+
+  -tft-rst 200 ms
+  +tft-rst 20 ms
+
+  spout 100 ms
+  invon
+
+              $3A $3A $05 frmctr1 \ Frame rate 1 normal mode: line period; front porch, back porch
+              $3A $3A $05 frmctr2 \ Frame rate 2 idle mode: line period; front porch, back porch
+  $3a $3a $05 $3a $3a $05 frmctr3 \ Frame rate 3 dot inversion mode and column inverted mode
+
+          $03 invctr \ Display inversion control: %111= inversion in full color, idle and partial
+
+  $04 $02 $62 pwctr1   \ Powerctrl 1; AVDD=4.8V; GVDD=4.6V; ???; Mode=2X
+          $c0 pwctr2    \ Power Control 2 = ?????
+      $00 $0d pwctr3
+      $6a $8d pwctr4
+      $ee $8d pwctr5
+          $0e vmctr1 \ VCOM Control 1: 001110=-0.775 V
+
+  $10 $0e $0d $00 $37 $27 $12 $0a $07 $02 $07 $0e $03 $02 $0e $10 gamctrp1
+  $10 $0e $0d $00 $36 $26 $13 $0a $08 $02 $06 $0f $03 $03 $0e $10 gamctrn1
+
+  \ full color interface pixel format: 101=16bit/pixel
+  $05 colmode
+
+  \ Memory data access: 1111000 = MX:colum adress; MV:Row colum Exchange: Landscape mode
+  $78 madctl \ ML:vertical Refresh bottom to Top  RGB:GBR
+
+  dispon
+
+  \ Select complete memory area for writing
+  105 0 26 0 raset
+  160 0  1 0 caset
+;
+
+\ -----------------------------------------------------------------------------
+\   Grafikpuffer
+\ -----------------------------------------------------------------------------
+
+25600 buffer: image
+
+: refresh ( -- )
+  ramwr
+  +tft-d/cx
+  -tft-csx
+  25600 0 do
+
+    i image + c@
+
+    ( raw-byte>tft, inlined for maximum speed )
+
+    spi0_data h!
+    begin ( receive? ) spi0_stat @ 1 and until
+    spi0_data h@ drop
+
+   loop
+   +tft-csx
+;
+
+: clear ( -- ) image 25600 0 fill refresh ;
+
+0 variable farbe \ RGB 5:6:5
+
+: putpixel ( x y -- ) 160 * swap + 2* image + farbe h@ swap h! ;

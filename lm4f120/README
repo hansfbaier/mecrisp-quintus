@@ -1,0 +1,5 @@
+Includes Mamihlapinatapai, an instruction set emulator for ARM Cortex M3/M4.
+
+lm4flash mecrisp-quintus-lm4f120-mamihlapinatapai-with-disassembler-and-pll.bin
+
+picocom -b 115200 /dev/ttyACM0 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 500 -c 3 -n"

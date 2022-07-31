@@ -1,0 +1,38 @@
+
+How to install and use :
+
+iceprog icebreaker.bin
+iceprog -o 1M mecrisp-quintus-icebreaker-with-tools.bin
+./terminal
+
+Memory map:
+
+$00000000 - $00000FFF:  4 kb RAM
+$00001000 - $0000AFFF: 40 kb RAM, containing mirrored Flash contents
+$00100000 - $00200000: SPI Flash memory, slow.
+
+IO Registers:
+
+  $20000010: PORTA IN
+  $20000020: PORTA OUT
+  $20000040: PORTA DIR
+  $20000080: LEDs
+
+  $20000100: PORTB IN
+  $20000200: PORTB OUT
+  $20000400: PORTB DIR
+
+  $20001000: PORTC IN
+  $20002000: PORTC OUT
+  $20004000: PORTC DIR
+
+  $20010000: UART RX / TX
+  $20020000: Random, TX Flag, RX Flag
+  $20040000: Cycle counter
+  $20080000: Cycle counter reload value on overflow
+
+PicoRV is configured without qreg support, and I changed the registers
+for interrupt return and interrupt cause to x30 and x31, respectively.
+
+The cycle counter counts up, triggers an interrupt on overflow and
+loads the value from the reload register, which defaults to 0.

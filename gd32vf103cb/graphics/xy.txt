@@ -1,0 +1,113 @@
+\ xy.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+
+\ Later on I have to do some calculations with xy-coordinates.
+\ So here are some words to ease it.
+\ the words come in three flavors:
+\ 1. xy-high-level.txt: defined in high-level, no advantage
+\ in speed but better legibility
+\ 2. This file xy.txt: defined with Matthias's inline assembler -- more speed!
+\ 3. File xy-hard.txt: hard coded - if you won't have
+\    the assembler installed.
+\ Use it to your convenience.
+
+\ My first try with mecrisps inline-assembler
+\ some graphic basics i.e. calculate coordinates
+
+\  x0  : Contains zero. Hardwired in silicon.
+\  x1  : "Link register", holds link back and is also used to compose long calls with auipc and jalr
+\  x2  : SP Stack pointer for return stack.
+\  x3  : Loop index
+\  x4  : Loop limit
+\  x5  : Scratch register, needs to be saved.
+\  x6  : Scratch register, needs to be saved.
+\  x7  : Scratch register, needs to be saved.
+\  x8  : TOS Top of data stack.
+\  x9  : PSP Data stack pointer.
+\  x10 : Scratch register, needs to be saved.
+\  x11 : Scratch register, needs to be saved.
+\  x12 : Scratch register, needs to be saved.
+\  x13 : Scratch register, needs to be saved.
+\  x14 : Free scratch register, not saved across calls.
+\  x15 : Free scratch register, not saved across calls.
+\
+\  x16 to x31 : Unused in vanilla cores.
+\
+\  Besides x0=zero, nothing is enforced by hardware on this architecture.
+\
+\  Acrobatics compiler is using x16 to x25 are (sic!) free scratch registers, not saved across calls.
+
+: xywh+ ( x y n1 n2 -- x y x+n1 y+n2 )  \ no changes in stackpointer!
+    _lw x15 x9 4        \ 3OS
+    _add x8 x8 x15      \ TOS = TOS+3OS
+    _lw x15 x9 8        \ R15 = 4OS 
+    _lw x16 x9 0        \ R16=NOS
+    _add x15 x15 x16    \ R15 = NOS+4OS
+    _sw x15 x9 0        \ NOS = R15
+    4-foldable
+;
+
+
+: xy+ ( x y n1 n2 -- x+n1 y+n2 )
+    _lw x15 x9 4        \ 3OS             
+    _add x8 x8 x15      \ TOS + 
+    _lw x15 x9 8        \ 4OS 
+    _lw x16 x9 0        \ NOS
+    _add x15 x15 x16    \ r15 = NOS+4OS
+    _addi x9 x9 8       \ SP-2cells
+    _sw x15 x9 0        \ NOS = NOS+4OS
+    4-foldable
+;
+
+: xywh- ( x y n1 n2 -- x y x+n1 y+n2 )  \ no changes in stackpointer!
+    _lw x15 x9 4        \ 3OS
+    _sub x8 x15 x8      \ TOS = TOS-3OS
+    _lw x15 x9 8        \ R15 = 4OS 
+    _lw x16 x9 0        \ R16=NOS
+    _sub x15 x15 x16    \ R15 = NOS-4OS
+    _sw x15 x9 0        \ NOS = R15
+    4-foldable
+;
+
+: xy- ( x y n1 n2 -- x+n1 y+n2 )
+    _lw x15 x9 4        \ 3OS             
+    _sub x8 x15 x8      \ TOS = TOS - 3OS
+    _lw x15 x9 8        \ 4OS 
+    _lw x16 x9 0        \ NOS
+    _sub x15 x15 x16    \ r15 = NOS - 4OS
+    _addi x9 x9 8       \ SP-2cells
+    _sw x15 x9 0        \ NOS = NOS+4OS
+    4-foldable
+;
+
+: xy-minmax ( x0 y0 x1 y1 -- x0 y0 x1 y1 ) \ after: 0<x0<x1 0<y0<y1
+    _lw x15 x9 4        \ load 3OS to R15 (y0)
+    _blt x15 x8 +       \ branch forward (+) if R8 less than R15
+    _mv x14 x8          \ move TOS to R14  
+    _mv x8 x15          \ move R15 to TOS 
+    _sw x14 x9 4        \ move R14 to 3OS 
+l+: _lw x15 x9 8        \ load 4OS to R15
+    _lw x14 x9 0        \ load NOS to R14
+    _blt x15 x14 +     \ branch forward (+) IF R14 less than R15
+    _sw x14 x9 8
+    _sw x15 x9 0     
+l+:
+    4-foldable
+;
+
+
+\ tests
+10 20 30 40 xy-minmax . . . . \ 40 30 20 10
+10 40 30 20 xy-minmax . . . . \ 40 30 20 10
+30 20 10 40 xy-minmax . . . . \ 40 30 20 10
+30 40 10 20 xy-minmax . . . . \ 40 30 20 10
+10 20 -3 5 xywh+ . . . . \ 25 7 20 10
+10 20 -3 5 xy+ . .       \ 25 7
+10 20 -3 5 xywh- . . . . \ 15 3 20 10
+10 20 -3 5 xy- . .       \ 15 13
+
+

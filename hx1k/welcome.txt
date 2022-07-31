@@ -1,0 +1,26 @@
+
+$400004 constant port-leds
+$400020 constant port-in
+$400040 constant port-out
+$400080 constant port-dir
+
+: random ( -- x ) 0 32 0 do 2* port-in @ 24 rshift or loop ;
+
+: leds ( x -- ) port-leds ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 48000 * delay-ticks ;
+: us ( u -- )    48 * delay-ticks ;
+
+: init ( -- ) welcome ;

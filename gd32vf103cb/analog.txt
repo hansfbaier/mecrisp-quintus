@@ -1,0 +1,171 @@
+
+\ -------------------------------------------------------------
+\   Analog input and output
+\ -------------------------------------------------------------
+
+: bit ( u -- u ) 1 swap lshift 1-foldable ;
+
+\ -------------------------------------------------------------
+\  Chip serial number
+\ -------------------------------------------------------------
+
+: chipid ( -- u1 u2 u3 3 )  \ unique chip ID as N values on the stack
+  $1FFFF7E8 @ $1FFFF7EC @ $1FFFF7F0 @ 3 ;
+: hwid ( -- u )  \ a "fairly unique" hardware ID as single 32-bit int
+  chipid 1 do xor loop ;
+
+\ -------------------------------------------------------------
+\  IO Registers
+\ -------------------------------------------------------------
+
+$40013800 constant USART1
+  USART1 $8 + constant USART1-BRR
+
+$40021000 constant RCU_BASE
+
+  RCU_BASE $00 + constant RCC-CR
+  RCU_BASE $04 + constant RCC-CFGR
+  RCU_BASE $14 + constant RCU_AHBEN
+  RCU_BASE $18 + constant RCU_APB2EN
+  RCU_BASE $1C + constant RCU_APB1EN
+
+\ -------------------------------------------------------------
+\  Clock setup and timing
+\ -------------------------------------------------------------
+
+: 72MHz ( -- )  \ Set the main clock to 72 MHz, keep baud rate at 115200
+
+  16 bit RCC-CR bis!              \ Set HSEON
+  begin 17 bit RCC-CR bit@ until  \ Wait for HSERDY
+
+  1 16 lshift                     \ HSE clock is 8 MHz Xtal source for PLL
+  7 18 lshift or                  \ PLL factor: 8 MHz * 9 = 72 MHz = HCLK = PCLK2
+  4  8 lshift or                  \ PCLK1 = HCLK/2 = 36 MHz. Maximum is 54 MHz.
+  2 14 lshift or                  \ ADCPRE = PCLK2/6 = 12 MHz. Maximum is 14 MHz.
+            2 or  RCC-CFGR !      \ PLL is the system clock
+
+  24 bit RCC-CR bis!              \ Set PLLON
+  begin 25 bit RCC-CR bit@ until  \ Wait for PLLRDY
+
+  625 USART1-BRR !                \ Fix console baud rate
+;
+
+\ -------------------------------------------------------------
+\  Busy wait
+\ -------------------------------------------------------------
+
+\ : us ( u -- )   2* 0 ?do [ $0001 h, ] loop ; \ c.nop for 4 cycles/loop run, for 8 MHz
+  : us ( u -- ) 18 * 0 ?do [ $0001 h, ] loop ; \ c.nop for 4 cycles/loop run, for 72 MHz
+  : ms ( u -- )      0 ?do 999 us loop ;
+
+\ -------------------------------------------------------------
+\  IO Registers
+\ -------------------------------------------------------------
+
+$40007400 constant DAC_BASE
+
+  DAC_BASE $00 + constant DAC_CTL
+  DAC_BASE $04 + constant DAC_SWT
+
+  DAC_BASE $08 + constant DAC0_R12DH
+  DAC_BASE $14 + constant DAC1_R12DH
+  DAC_BASE $20 + constant DACC_R12DH
+
+$40012400 constant ADC0_BASE
+$40012800 constant ADC1_BASE
+
+  ADC0_BASE $00 + constant ADC0_SR
+  ADC0_BASE $04 + constant ADC0_CR1
+  ADC0_BASE $08 + constant ADC0_CR2
+  ADC0_BASE $0C + constant ADC0_SMPR1
+  ADC0_BASE $10 + constant ADC0_SMPR2
+  ADC0_BASE $2C + constant ADC0_SQR1
+  ADC0_BASE $30 + constant ADC0_SQR2
+  ADC0_BASE $34 + constant ADC0_SQR3
+  ADC0_BASE $4C + constant ADC0_DR
+
+  ADC1_BASE $00 + constant ADC1_SR
+  ADC1_BASE $04 + constant ADC1_CR1
+  ADC1_BASE $08 + constant ADC1_CR2
+  ADC1_BASE $0C + constant ADC1_SMPR1
+  ADC1_BASE $10 + constant ADC1_SMPR2
+  ADC1_BASE $2C + constant ADC1_SQR1
+  ADC1_BASE $30 + constant ADC1_SQR2
+  ADC1_BASE $34 + constant ADC1_SQR3
+  ADC1_BASE $4C + constant ADC1_DR
+
+\ -------------------------------------------------------------
+\   DAC
+\ -------------------------------------------------------------
+
+\ DAC0 output is on pin A4, DAC1 output is on pin A5.
+
+: dacs ( dac0 dac1 -- )
+  \ DAC1_R12DH ! DAC0_R12DH !
+    16 lshift or DACC_R12DH !  \ Set both channels at once
+;
+
+: init-dac ( -- )
+  29 bit RCU_APB1EN bis! \ Enable clock for DAC
+
+  PORTA_CRL @ $FF00FFFF and ( $00000000 or ) PORTA_CRL ! \ Switch PA4 and PA5 to analog mode
+
+  $00010001 DAC_CTL !
+  0 0 dacs
+;
+
+\ -------------------------------------------------------------
+\   ADC
+\ -------------------------------------------------------------
+
+: adc0-conversion ( -- u )
+  ADC0_CR2 @ 1 or ADC0_CR2 ! \ Start conversion
+  begin ADC0_SR @ 1 bit and until \ Wait for EOC flag
+  ADC0_DR @
+;
+
+: adc0 ( channel -- u )
+  ADC0_SQR3 ! \ Select channel
+  adc0-conversion
+;
+
+: adc0-vcc ( -- mv )  \ return estimated Vcc, based on 1.2V internal bandgap
+  4096 1200  17 adc0 */
+;
+
+: init-adc0 ( -- )
+
+  9 bit ( 10 bit or ) RCU_APB2EN bis! \ Enable ADC0, bit 9. ADC1: Bit 10
+
+  23 bit                \ Set TSVREFE for vRefInt use
+   0 bit or ADC0_CR2 !  \ Set ADON to enable ADC
+
+  adc0-conversion drop
+;
+
+\ -------------------------------------------------------------
+\   Testing and Demo
+\ -------------------------------------------------------------
+
+: triangle ( -- ) \ Waveform on PA4 and PA5
+  72mhz
+  init-dac
+
+  begin
+    $1000 0 do  i          $FFF i - dacs loop
+    $1000 0 do  $FFF i -   i        dacs loop
+  key? until
+;
+
+: capture ( -- ) \ Sample PA0
+  72mhz
+  init-adc0
+
+  PORTA_CRL @ $FFFFFFF0 and ( $00000000 or ) PORTA_CRL ! \ Switch PA0 to analog mode
+
+  0 ADC0_SQR3 ! \ Select channel 0
+
+  begin
+    adc0-conversion hex. cr
+  key? until
+;

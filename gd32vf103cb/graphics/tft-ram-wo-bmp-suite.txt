@@ -1,0 +1,53 @@
+\ tft-ram-wo-bmp-suite.txt
+\ Part of pixelmaler-v0.1 for Mecrisp-Quintus - A native code Forth implementation for RISC-V
+\ Copyright (C) 2018  Matthias Koch
+\ display longan nano
+\ MB March 2020
+
+\ loads selected files into RAM
+\ you have to choose which parts of the suite you want
+\ because all together dosn't fit into ram memory
+
+
+compiletoram
+
+
+
+#include  ms.fs \ essential for spi0 and 104mhz
+\ flamingo and init are invoked during compilation of
+\ 104-init 
+: Flamingo ; \ Dummy essential for 104mhz
+: init ;     \ Dummy essential for 104mhz
+#include  gd32vf103-104mhz.fs  \ convenience
+104-init
+
+#include  spi0-hard.txt  \ essential for tft-basics
+#include  xy-hard.txt    \ essential for tft-basics
+#include  tft-basics.txt \ essential
+#include  tft-graphics.txt \ At your wish
+
+
+compiletoflash  \ At your wish. Load only one time. Comment out
+#include  Lat15-Terminus32x16.mfnt  \ at second, third ... time
+#include  mecrisp-fonts.txt         \ or use eraseflash 
+compiletoram                  \
+
+#include  tft-fonts.txt  \ At your wish
+#include  tft-scroll.txt \ At your wish
+
+\ \ SPI registers needed by mysdcard2.txt
+\  $40010C00 constant PORTB_Base        \ essential for tft-bmp.txt
+\  PORTB_BASE $04 + constant PORTB_CRH  \ essential for tft-bmp.txt
+\  PORTB_BASE $08 + constant PORTB_IDR  \ essential for tft-bmp.txt
+\  PORTB_BASE $10 + constant PORTB_BSRR \ essential for tft-bmp.txt
+\  PORTB_BASE $14 + constant PORTB_BRR  \ essential for tft-bmp.txt
+\  #include  dump.fs                    \ essential for tft-bmp.txt
+\  #include  mysdcard2.txt              \ essential for tft-bmp.txt
+\  #include  tft-bmp.txt                \ essential for tft-bmp.txt
+
+
+\ #include manhattan.fs
+#include  fixpt-math-lib.fs \ essential for turtle.fs
+#include  turtle.fs
+
+tft-init

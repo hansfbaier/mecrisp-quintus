@@ -1,0 +1,377 @@
+#!/bin/bash
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hx1k" ]]
+then
+cd mecrisp-quintus-source/hx1k
+make clean all
+cp *.bin ../../hx1k
+make clean
+cd ../..
+
+cd hx1k
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu-hx1k
+mv quintusemu-hx1k ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/assembler-rv32im.txt ../common/emulator-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/forget.txt ../common/flamingo.txt welcome.txt > included.txt
+./buildcore ./quintusemu-hx1k mecrisp-quintus-hx1k.bin included.txt mecrisp-quintus-hx1k-with-disassembler.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hx8k" ]]
+then
+cd mecrisp-quintus-source/hx8k
+make clean all
+cp *.bin ../../hx8k
+make clean
+cd ../..
+
+cd hx8k/hx8k-breakout-verilog
+# Takes a very long time !
+# ./compile
+./tidyup
+cp hx8k-breakout.bin ..
+cd ..
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu-hx8k
+mv quintusemu-hx8k ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32imc.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt > included.txt
+./buildcore ./quintusemu-hx8k mecrisp-quintus-hx8k.bin included.txt mecrisp-quintus-hx8k-with-disassembler.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "icebreaker" ]]
+then
+cd mecrisp-quintus-source/icebreaker
+make clean all
+cp *.bin ../../icebreaker
+make clean
+cd ../..
+
+cd icebreaker/icebreaker-verilog
+# Takes a very long time !
+# ./compile
+./tidyup
+cp icebreaker.bin ..
+cd ..
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu
+mv quintusemu ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt > included-acrobatics.txt
+cat ../common/conditional.txt                          ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt > included-tools.txt
+
+./buildcore ./quintusemu mecrisp-quintus-icebreaker.bin included-acrobatics.txt mecrisp-quintus-icebreaker-with-acrobatics.bin
+./buildcore ./quintusemu mecrisp-quintus-icebreaker.bin included-tools.txt      mecrisp-quintus-icebreaker-with-tools.bin
+./buildcore ./quintusemu mecrisp-quintus-icebreaker.bin ledcomm.txt             mecrisp-quintus-icebreaker-with-ledcomm.bin
+
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "icebreaker-femtorv32" ]]
+then
+cd mecrisp-quintus-source/icebreaker-femtorv32
+make clean all
+cp *.bin ../../icebreaker-femtorv32
+make clean
+cd ../..
+
+cd icebreaker-femtorv32/icebreaker-verilog
+# Takes a very long time !
+# ./compile
+./tidyup
+cp icebreaker.bin ..
+cd ..
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu-icebreaker
+mv quintusemu-icebreaker ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt welcome.txt > included-tools.txt
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt ../common/assembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/emulator-rv32imc.txt                        ../common/forget.txt ../common/flamingo.txt welcome.txt > included-emulator.txt
+
+./buildcore ./quintusemu-icebreaker mecrisp-quintus-icebreaker.bin included-tools.txt      mecrisp-quintus-icebreaker-with-tools.bin
+./buildcore ./quintusemu-icebreaker mecrisp-quintus-icebreaker.bin included-emulator.txt   mecrisp-quintus-icebreaker-with-emulator.bin
+
+# Too large for this memory map...
+# cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-rv32im.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt welcome.txt > included-acrobatics.txt
+# ./buildcore ./quintusemu-icebreaker mecrisp-quintus-icebreaker.bin included-acrobatics.txt mecrisp-quintus-icebreaker-with-acrobatics.bin
+
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "lm4f120" ]]
+then
+cd mecrisp-quintus-source/mamihlapinatapai
+./assemble
+cd ../lm4f120
+make clean all
+cp *.bin ../../lm4f120
+make clean
+cd ../..
+
+cd lm4f120
+cd quintusemu-source
+fpc -XX -O3 quintusemu-lm4f120
+mv quintusemu-lm4f120 ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt pll.txt init.txt > included.txt
+./buildcore ./quintusemu-lm4f120 mecrisp-quintus-lm4f120-mamihlapinatapai.bin included.txt mecrisp-quintus-lm4f120-mamihlapinatapai-with-disassembler-and-pll.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "tm4c1294" ]]
+then
+cd mecrisp-quintus-source/tm4c1294
+make clean all
+cp *.bin ../../tm4c1294
+make clean
+cd ../..
+
+cd tm4c1294
+cd quintusemu-source
+fpc -XX -O3 quintusemu-tm4c1294
+mv quintusemu-tm4c1294 ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt pll.txt init.txt > included.txt
+./buildcore ./quintusemu-tm4c1294 mecrisp-quintus-tm4c1294-mamihlapinatapai.bin included.txt mecrisp-quintus-tm4c1294-mamihlapinatapai-with-disassembler-and-pll.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "gd32vf103cb" ]]
+then
+
+cd mecrisp-quintus-source/gd32vf103cb
+make clean all
+cp *.bin ../../gd32vf103cb
+make clean
+cd ../..
+
+cd gd32vf103cb
+cd quintusemu-source
+fpc -XX -O3 quintusemu-gd32vf103cb
+mv quintusemu-gd32vf103cb ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt basisdefinitions.txt > included.txt
+./buildcore ./quintusemu-gd32vf103cb mecrisp-quintus-gd32vf103cb.bin included.txt mecrisp-quintus-gd32vf103cb-with-disassembler-and-math.bin
+
+cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-rv32imc.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt basisdefinitions-acrobatics.txt > included-acrobatics.txt
+./buildcore ./quintusemu-gd32vf103cb mecrisp-quintus-gd32vf103cb.bin included-acrobatics.txt mecrisp-quintus-gd32vf103cb-with-acrobatics.bin
+
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hifive1B" ]]
+then
+cd mecrisp-quintus-source/hifive1B
+make clean all
+cp *.bin *.hex ../../hifive1B
+make clean
+cd ../..
+
+cd hifive1B
+cd quintusemu-source
+fpc -XX -O3 quintusemu-hifive1B
+mv quintusemu-hifive1B ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32imc.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt > included.txt
+./buildcore ./quintusemu-hifive1B mecrisp-quintus-hifive1B.bin included.txt mecrisp-quintus-hifive1B-with-disassembler.bin
+riscv64-linux-gnu-objcopy --change-addresses 0x20010000 -I binary -O ihex mecrisp-quintus-hifive1B-with-disassembler.bin mecrisp-quintus-hifive1B-with-disassembler.hex
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "hifive1A" ]]
+then
+cd mecrisp-quintus-source/hifive1A
+make clean all
+cp *.bin *.hex ../../hifive1A
+make clean
+cd ../..
+
+cd hifive1A
+cd quintusemu-source
+fpc -XX -O3 quintusemu-hifive1A
+mv quintusemu-hifive1A ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32imc.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt > included.txt
+./buildcore ./quintusemu-hifive1A mecrisp-quintus-hifive1A.bin included.txt mecrisp-quintus-hifive1A-with-disassembler.bin
+riscv64-linux-gnu-objcopy --change-addresses 0x20400000 -I binary -O ihex mecrisp-quintus-hifive1A-with-disassembler.bin mecrisp-quintus-hifive1A-with-disassembler.hex
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-mips" ]]
+then
+cd mecrisp-quintus-source/linux-mips
+./assemble
+mv mecrisp-quintus-linux-mips ../../linux-mips
+rm *.o *.list
+cd ../..
+
+cd linux-mips
+./buildcore-linux-mips
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-rv32im" ]]
+then
+cd mecrisp-quintus-source/linux-rv32im
+./assemble
+mv mecrisp-quintus-linux-rv32im ../../linux-rv32im
+rm *.o *.list
+cd ../..
+
+cd linux-rv32im
+./buildcore-linux-rv32im
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "linux-rv32imc" ]]
+then
+cd mecrisp-quintus-source/linux-rv32imc
+./assemble
+mv mecrisp-quintus-linux-rv32imc ../../linux-rv32imc
+rm *.o *.list
+cd ../..
+
+cd linux-rv32imc
+./buildcore-linux-rv32imc
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "pic32mx5" ]]
+then
+cd mecrisp-quintus-source/pic32mx570f512l
+./assemble
+mv *.hex ../../pic32mx570f512l
+mv *.bin ../../pic32mx570f512l
+rm *.o
+rm *.elf
+cd ../..
+
+cd pic32mx570f512l
+./precompile
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "pic32mx2" ]]
+then
+cd mecrisp-quintus-source/pic32mx270f256b
+./assemble
+mv *.hex ../../pic32mx270f256b
+mv *.bin ../../pic32mx270f256b
+rm *.o
+rm *.elf
+cd ../..
+
+cd pic32mx270f256b
+./precompile
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "vega" ]]
+then
+cd mecrisp-quintus-source/vega
+make clean all
+cp *.bin ../../vega
+make clean
+cd ../..
+
+cd vega
+cd quintusemu-source
+fpc -XX -O3 quintusemu-vega
+mv quintusemu-vega ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt basisdefinitions.txt > included.txt
+./buildcore ./quintusemu-vega mecrisp-quintus-vega.bin included.txt mecrisp-quintus-vega-with-tools.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "ulx3s" ]]
+then
+cd mecrisp-quintus-source/ulx3s
+make clean all
+cp *.bin ../../ulx3s
+make clean
+cd ../..
+
+cd ulx3s/ulx3s-verilog
+# Takes a very long time !
+# ./compile
+./tidyup
+mv *.bit ..
+cd ..
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu-ulx3s
+mv quintusemu-ulx3s ..
+rm -f *.o *.ppu
+cd ..
+
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt ../common/dump.txt welcome.txt > included-tools.txt
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt ../common/assembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/emulator-rv32imc.txt                        ../common/forget.txt ../common/flamingo.txt ../common/dump.txt welcome.txt > included-emulator.txt
+
+./buildcore ./quintusemu-ulx3s mecrisp-quintus-ulx3s.bin included-tools.txt      mecrisp-quintus-ulx3s-with-tools.bin
+./buildcore ./quintusemu-ulx3s mecrisp-quintus-ulx3s.bin included-emulator.txt   mecrisp-quintus-ulx3s-with-emulator.bin
+
+# Too large for this memory map...
+# cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-rv32im.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt welcome.txt > included-acrobatics.txt
+# ./buildcore ./quintusemu-ulx3s mecrisp-quintus-icebreaker.bin included-acrobatics.txt mecrisp-quintus-icebreaker-with-acrobatics.bin
+
+cd ..
+fi

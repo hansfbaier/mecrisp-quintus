@@ -1,0 +1,22 @@
+
+
+: mreg@: ( csr -- )
+  20 lshift >r
+  :
+  postpone dup
+  $00002473 r> or , \ csrrs x8, csr, x0
+  postpone ;
+;
+
+: mreg!: ( csr -- )
+  20 lshift >r
+  :
+  $00041073 r> or , \ csrrw x0, csr, x8
+  postpone drop
+  postpone ;
+;
+
+$b00 dup mreg@: mcycle@ mreg!: mcycle!
+
+see mcycle@
+see mcycle!

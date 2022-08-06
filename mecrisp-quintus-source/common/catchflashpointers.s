@@ -106,26 +106,33 @@
   laf x7, RamDictionaryEnde     # Fürs Abzählen des Variablenplatzes  Variables start at the end of RAM dictionary
 
 SucheFlashPointer_Hangelschleife:
+  dbg 'H'
 #  pushda x8
 #  call hexdot
 #  writeln "Hangelschleife"
   lw x11, 4(x8)  # Aktuelle Flags lesen  Fetch current Flags
 
   li x13, Flag_invisible # Flag_invisible ? Überspringen !  Skip invisible definitions
+  dbg '1'
   beq x11, x13, Sucheflashpointer_Speicherbelegung_fertig
+  dbg '2'
 
     # Dies Wort ist sichtbar. Prüfe, ob es Ram-Speicher anfordert und belegt.
     # This definition is visible. Check if it allocates RAM.
 
     andi x13, x11, Flag_buffer & ~Flag_visible
+    dbg '3'
     beq x13, zero, 1f # No buffer requested.
 
       # Search for end of code of current definition.
       push x8
 
       addi x8, x8, 8
+      dbg 'S'
       call skipstring  # x8 zeigt nun an den Codebeginn des aktuellen Wortes.  x8 points to start of code of current definition
+      dbg 'D'
       call suchedefinitionsende # Advance pointer to end of code. This is detected by "bx lr" or "pop {pc}" opcodes.
+      dbg 'E'
 
       # x8 ist nun an der Stelle, wo die Initialisierungsdaten liegen. x8 now points to the location of the initialisation at the end of code of current definition.
 
@@ -138,9 +145,10 @@ SucheFlashPointer_Hangelschleife:
       lw x13, 0(x8) # Fetch required length of buffer
       .endif
 
- #     pushda x13
- #     call hexdot
- #     writeln " buffer:"
+      dbg 'C'
+#      pushda x13
+#     call hexdot
+#      writeln " buffer:"
 
       # Ramvariablenpointer wandern lassen  Subtract from the pointer that points to the next free location
       sub x7, x7, x13
@@ -153,8 +161,10 @@ checksums: # Registerprüfsummen für x1 bis x15  Self-test register checksums f
       .word 0x2442A08A, 0x03B031A0, 0x83942086, 0x00060001  #  x8 - x11
       .word 0x18000008, 0x272E0A20, 0x28602D5F, 0x3C292F5C  # x12 - x15
 
-1:  andi x13, x11, Flag_ramallot & ~Flag_visible
+1:  dbg '4'
+    andi x13, x11, Flag_ramallot & ~Flag_visible
     beq x13, zero, Sucheflashpointer_Speicherbelegung_fertig # Benötigt doch kein RAM.
+    dbg '5'
       # writeln "Speicher gewünscht !"
       # Die Flags werden später nicht mehr gebraucht.
       # This one allocates RAM, Flags are not needed anymore.
@@ -192,8 +202,12 @@ Sucheflashpointer_Speicherbelegung_fertig:
   # Speicherbelegung und -initialisierung abgeschlossen.
   # Finished RAM allocation and initialisation.
 
+  dbg 'f'
+  # writeln "speicherbelegung fertig"
+
   # Weiterhangeln  Continue crawl.
   call dictionarynext
+  dbg 'd'
   popda x10
   beq x10, zero, SucheFlashPointer_Hangelschleife
 

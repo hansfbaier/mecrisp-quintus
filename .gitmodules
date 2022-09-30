@@ -4,3 +4,6 @@
 [submodule "ch56x"]
 	path = ch56x
 	url = git@github.com:hansfbaier/mecrisp-quintus-ch56x-boardsupport.git
+[submodule "mecrisp-quintus-source/ch582"]
+	path = mecrisp-quintus-source/ch582
+	url = git@github.com:hansfbaier/mecrisp-quintus-ch582-port.git

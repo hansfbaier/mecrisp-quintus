@@ -5,9 +5,10 @@ mipsel-linux-gnu-ld -T memmap.ld -o mecrisp-quintus-pic32mx270f256b.elf mecrisp-
 
 mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b.elf mecrisp-quintus-pic32mx270f256b.hex -O ihex
 
-# mipsel-linux-gnu-objdump -Mgpr-names=32,cp0-names=mips32,cp0-names=mips32,hwr-names=mips32,reg-names=numeric -D mecrisp-quintus-pic32mx270f256b.elf > mecrisp-quintus-pic32mx270f256b.list
-# mipsel-linux-gnu-objdump -h mecrisp-quintus-pic32mx270f256b.elf > mecrisp-quintus-pic32mx270f256b.map
+mipsel-linux-gnu-objdump -Mgpr-names=32,cp0-names=mips32,cp0-names=mips32,hwr-names=mips32,reg-names=numeric -D mecrisp-quintus-pic32mx270f256b.elf > mecrisp-quintus-pic32mx270f256b.list
+mipsel-linux-gnu-objdump -h mecrisp-quintus-pic32mx270f256b.elf > mecrisp-quintus-pic32mx270f256b.map
 
 mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b.elf mecrisp-quintus-pic32mx270f256b-boot.bin --only-section .boot -O binary
 mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b.elf mecrisp-quintus-pic32mx270f256b-text.bin --only-section .text -O binary
 
+md5sum *.hex

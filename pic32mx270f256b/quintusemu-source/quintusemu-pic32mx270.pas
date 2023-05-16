@@ -350,7 +350,7 @@ end;
 
 function disassemble(addr, inst : dword) : string;
 begin
-  if inst = $00000000 then begin disassemble := 'nop'; exit; end;
+  if inst = $00000000 then begin disassemble := 'nop'; exit; end else disassemble := '';
 
   case opcode(inst) of
 
@@ -378,6 +378,12 @@ begin
 //    21: disassemble := 'bnel'  + disassemble_i_branch (addr, inst);
 //    22: disassemble := 'blezl' + disassemble_i_branch (addr, inst);
 //    23: disassemble := 'bgtzl' + disassemble_i_branch (addr, inst);
+
+  // -------------------------------------------------------------------------
+
+    28: if (inst and $3F) = 2 then
+        disassemble := 'mul' +  disasm_r_3reg(inst) ;
+
   // -------------------------------------------------------------------------
     32: disassemble := 'lb'  + disassemble_i_loadstore (addr, inst);
     33: disassemble := 'lh'  + disassemble_i_loadstore (addr, inst);
@@ -566,6 +572,10 @@ end;
 //    21: { bnel }
 //    22: { blezl }
 //    23: { bgtzl }
+
+  // -------------------------------------------------------------------------
+    28: { mul } if (inst and $3F) = 2 then
+                  write_register( rd(inst),  read_register(rs(inst))  *  read_register(rt(inst)) );
   // -------------------------------------------------------------------------
     32: { lb }    write_register(rt(inst), sign8 (read8 (read_register(rs(inst)) + sign16(inst and $FFFF))));
     33: { lh }    write_register(rt(inst), sign16(read16(read_register(rs(inst)) + sign16(inst and $FFFF))));

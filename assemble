@@ -126,27 +126,13 @@ fi
 
 # -----------------------------------------------------------------------------
 
-if [[ -z "$1" || "$1" = "pic32mx5" ]]
-then
-cd mecrisp-quintus-source/pic32mx570f512l
-./assemble
-mv *.hex ../../pic32mx570f512l
-mv *.bin ../../pic32mx570f512l
-rm *.o
-rm *.elf
-cd ../..
-fi
-
-# -----------------------------------------------------------------------------
-
 if [[ -z "$1" || "$1" = "pic32mx2" ]]
 then
 cd mecrisp-quintus-source/pic32mx270f256b
 ./assemble
 mv *.hex ../../pic32mx270f256b
 mv *.bin ../../pic32mx270f256b
-rm *.o
-rm *.elf
+./tidyup
 cd ../..
 fi
 

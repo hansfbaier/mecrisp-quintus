@@ -15,6 +15,7 @@ $30   $fp   Frame pointer
 $31   $ra   Return address
 
 JAL in MIPS uses $31 !
+Save $1 when entering interrupts !
 
 */
 
@@ -23,22 +24,22 @@ JAL in MIPS uses $31 !
 .set x1,   $31   # Link register is x1 on RISC-V and $31 on MIPS
 .set x2,   $2    # Stack pointer is x2 on RISC-V and $29 on MIPS for normal call convention - take care when doing syscalls !
 .set sp,   $2    # Another name for stack pointer
-.set x3,   $3
-.set x4,   $4
-.set x5,   $5
-.set x6,   $6
-.set x7,   $7
+.set x3,   $3    # Loop index
+.set x4,   $4    # Loop limit
+.set x5,   $5    # Scratch register, needs to be saved.
+.set x6,   $6    # Scratch register, needs to be saved.
+.set x7,   $7    # Scratch register, needs to be saved.
 
-.set x8,   $8
-.set x9,   $9
-.set x10,  $10
-.set x11,  $11
-.set x12,  $12
-.set x13,  $13
-.set x14,  $14
-.set x15,  $15
+.set x8,   $8    # Top of data stack
+.set x9,   $9    # Data stack pointer
+.set x10,  $10   # Scratch register, needs to be saved.
+.set x11,  $11   # Scratch register, needs to be saved.
+.set x12,  $12   # Scratch register, needs to be saved.
+.set x13,  $13   # Scratch register, needs to be saved.
+.set x14,  $14   # Free scratch register, not saved across calls.
+.set x15,  $15   # Free scratch register, not saved across calls.
 
-# x16-x31 are unused in Mecrisp-Quintus Forth core
+# x16-x31 are unused in Mecrisp-Quintus Forth core, but x16 to x25 are used as "free scratch registers" by Acrobatics compiler.
 
 .set x16,  $16
 .set x17,  $17

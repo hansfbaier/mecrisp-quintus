@@ -167,7 +167,7 @@ ramallot Dictionarypointer, 4        # These five variables need to be exactly i
 ramallot ZweitDictionaryPointer, 4   # Dictionarypointer +  4
 ramallot Fadenende, 4                # Dictionarypointer +  8
 ramallot ZweitFadenende, 4           # Dictionarypointer + 12
-ramallot VariablenPointer, 4         # Dictionarypointer + 14
+ramallot VariablenPointer, 4         # Dictionarypointer + 16
 
 ramallot konstantenfaltungszeiger, 4
 ramallot leavepointer, 4
@@ -233,7 +233,7 @@ ramallot Eingabepuffer, Maximaleeingabe  # Eingabepuffer wird einen Adresse-Län
 .macro welcome Meldung
   call dotgaensefuesschen
         .byte 8f - 7f         # Compute length of string.
-7:      .ascii "Mecrisp-Quintus 0.37\Meldung\n"
+7:      .ascii "Mecrisp-Quintus 0.38\Meldung\n"
 
 .ifdef compressed_isa
 8:  .balign 2, 0      # Realign
@@ -254,7 +254,7 @@ CoreDictionaryAnfang: # Dictionary-Einsprungpunkt setzen
 .set CoreVariablenPointer, RamDictionaryEnde # Im Flash definierte Variablen kommen ans RAM-Ende
                                              # Variables defined in Flash are placed at the end of RAM
 
-  Definition Flag_invisible, "--- Mecrisp-Quintus 0.37 ---"
+  Definition Flag_invisible, "--- Mecrisp-Quintus 0.38 ---"
 
 .include "flash.s"
 

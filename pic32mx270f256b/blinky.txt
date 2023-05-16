@@ -1,0 +1,93 @@
+
+\ Blinky example, LED with anode on RPA1, cathode on GND
+
+\ ------------------------------------------------------------------------------
+\  Pinout
+\ ------------------------------------------------------------------------------
+\
+\              /MCLR  1  v 28  AVdd
+\         RPA0        2    27  AVss
+\         RPA1        3    26        RPB15
+\         RPB0        4    25        RPB14
+\         RPB1        5    24        RPB13
+\         RPB2        6    23  Vusb
+\         RPB3        7    22        RPB11
+\               Vss   8    21        RPB10
+\         RPA2        9    20  Vcap
+\         RPA3       10    19  Vss
+\         RPB4       11    18        RPB9
+\         RPA4       12    17        RPB8
+\               Vdd  13    16        RPB7
+\         RPB5       14    15  Vbus
+
+
+\ ------------------------------------------------------------------------------
+\   Accurate delays
+\ ------------------------------------------------------------------------------
+
+   24 constant cycles/us  \ For 24 MHz
+24000 constant cycles/ms
+
+: delay-cycles ( cycles -- )
+  cycles ( cycles start )
+  begin
+    pause
+    2dup ( cycles start cycles start )
+    cycles ( cycles start cycles start current )
+    swap - ( cycles start cycles elapsed )
+    u<=
+  until
+  2drop
+;
+
+: us ( u -- ) cycles/us * delay-cycles ;
+: ms ( u -- ) cycles/ms * delay-cycles ;
+
+\ ------------------------------------------------------------------------------
+\   GPIO registers
+\ ------------------------------------------------------------------------------
+
+$BF886000 constant ANSELA   \ Analog select.  0: Digital mode 1: Analog mode (default)
+$BF886010 constant TRISA    \ Data direction. 0: Output       1: Input       (default)
+$BF886020 constant PORTA    \ Port,  to read electrical state of pins or to write latch value
+$BF886030 constant LATA     \ Latch, contains the desired output state for the pins
+$BF886040 constant ODCA
+$BF886050 constant CNPUA
+$BF886060 constant CNPDA
+$BF886070 constant CNCONA
+$BF886080 constant CNENA
+$BF886090 constant CNSTATA
+
+$BF886100 constant ANSELB
+$BF886110 constant TRISB
+$BF886120 constant PORTB
+$BF886130 constant LATB
+$BF886140 constant ODCB
+$BF886150 constant CNPUB
+$BF886160 constant CNPDB
+$BF886170 constant CNCONB
+$BF886180 constant CNENB
+$BF886190 constant CNSTATB
+
+ 4 constant CLR
+ 8 constant SET
+12 constant INV
+
+\ ------------------------------------------------------------------------------
+\   Let it shine!
+\ ------------------------------------------------------------------------------
+
+1 1 lshift constant led \ LED on RPA1
+
+: blinky ( -- )
+
+  led ANSELA CLR + !  \ Switch LED pin to digital mode
+  led TRISA  CLR + !  \ Set LED pin as output
+
+  begin
+    led LATA INV + !  \ Toggle LED state
+    500 ms
+  key? until
+
+  led LATA CLR + !    \ LED off
+;

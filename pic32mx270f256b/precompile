@@ -6,15 +6,20 @@ mv quintusemu-pic32mx270 ..
 rm *.o
 cd ..
 
-cat ../common/conditional.txt ../common/disassembler-mips.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt > included.txt
+cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-mips.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt cornerstone.txt > included-acrobatics.txt
+cat ../common/conditional.txt                          ../common/disassembler-mips.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt cornerstone.txt > included-tools.txt
 
-./buildcore included.txt mecrisp-quintus-pic32mx270f256b-text-with-tools.bin
+
+./buildcore included-tools.txt      mecrisp-quintus-pic32mx270f256b-text-with-tools.bin
+./buildcore included-acrobatics.txt mecrisp-quintus-pic32mx270f256b-text-with-acrobatics.bin
 
 # Cat both files together. Use physical addresses instead of 0xBFC00000 and 0xBD000000 !
 
-srec_cat mecrisp-quintus-pic32mx270f256b-boot.bin -binary -offset 0x1FC00000 mecrisp-quintus-pic32mx270f256b-text-with-tools.bin -binary -offset 0x1D000000 -output mecrisp-quintus-pic32mx270f256b-with-tools.hex
+srec_cat mecrisp-quintus-pic32mx270f256b-boot.bin -binary -offset 0x1FC00000 mecrisp-quintus-pic32mx270f256b-text-with-tools.bin      -binary -offset 0x1D000000 -output mecrisp-quintus-pic32mx270f256b-with-tools.hex
+srec_cat mecrisp-quintus-pic32mx270f256b-boot.bin -binary -offset 0x1FC00000 mecrisp-quintus-pic32mx270f256b-text-with-acrobatics.bin -binary -offset 0x1D000000 -output mecrisp-quintus-pic32mx270f256b-with-acrobatics.hex
 
 # Just to have the same Intel HEX format...
 
-mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b-with-tools.hex -I ihex mecrisp-quintus-pic32mx270f256b-with-tools.hex -O ihex
-
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b.hex                 -I ihex mecrisp-quintus-pic32mx270f256b.hex                 -O ihex
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b-with-tools.hex      -I ihex mecrisp-quintus-pic32mx270f256b-with-tools.hex      -O ihex
+mipsel-linux-gnu-objcopy mecrisp-quintus-pic32mx270f256b-with-acrobatics.hex -I ihex mecrisp-quintus-pic32mx270f256b-with-acrobatics.hex -O ihex

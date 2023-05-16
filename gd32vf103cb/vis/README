@@ -1,0 +1,12 @@
+README
+
+When using the e4thcom Terminal Program you can load
+
+the VIS-Extension  vis-0.8.4.2-mecrisp-quintus.fs  with  #r vis
+
+and
+
+the Disassembler  vis-disassembler-rv32imc.fs  with  #r see
+
+MM-220810
+

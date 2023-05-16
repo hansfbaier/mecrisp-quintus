@@ -1,0 +1,57 @@
+#    VIS: VOCabularies (VOCs), ITEMs and STICKY Words for Mecrisp-Quintus
+#
+#    Copyright (C) 2017-2022  Manfred Mahlow
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+VIS-README for Mecrisp-Quintus 0.29 or later                   MM-200820.220814
+
+To add the VIS-Extension with support for VOCs, ITEMs and STICKY Words to
+Mecrisp-Quintus please take the following notes into consideration:
+
+1. The VIS-Extension is distributed as a source code file named 
+
+   vis-x.y.z-mecrisp-quintus.fs
+
+2. The VIS-Extension was written for Mecrisp-Quintus 0.27 on a Logan Nano 
+   Board with a GD32VF103 MCU. 
+
+   It's known to work well with later Mecrisp-Quintus releases for the GD32
+   and it may work with other MCUs but that's not yet tested.
+
+3. The VIS-Extension needs to be installed on a Mecrisp-Quintus core without
+   any pre-installed extensions.
+
+   Reset Mecrisp-Quintus with  ERASEFLASH  before loading the VIS-Extension.
+
+4. The VIS-Extension modifies some Mecrisp-Quintus hooks to link the wordlist
+   and context switching support into the Mecrisp-Quintus core. This is done
+   by a word named INIT.
+
+   Mecrisp-Quintus always executes the last defined INIT on startup or reset.
+
+   So, if you define your own INIT in your code, this INIT must execute the
+   last defined INIT to make shure, that all previously defined INITs down 
+   to the one of the VIS-Extension are executed. Otherwise the VIS-Extension
+   (and maybe other extensions) will fail.
+
+5. From a user perspective there is no difference between the VIS-Extension
+   for Mecrisp-Quintus and Mecrisp-Stellaris.
+
+   You can find a VIS Glossary (for Mecrisp-Stellaris) in the Forth-Magazin
+   Vierte Dimension 1/2020 and some VIS (Mini) HOWTOs in VD 1/2020 ff.
+
+6. Feeback to the author : manfred.mahlow@forth-ev.de
+

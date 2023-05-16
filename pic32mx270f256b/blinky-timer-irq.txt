@@ -1,0 +1,94 @@
+
+\ A timer interrupt blinky example, LED with anode on RPA1, cathode on GND
+
+\ ------------------------------------------------------------------------------
+\   GPIO registers
+\ ------------------------------------------------------------------------------
+
+ 4 constant CLR
+ 8 constant SET
+12 constant INV
+
+$BF886000 constant ANSELA   \ Analog select.  0: Digital mode 1: Analog mode (default)
+$BF886010 constant TRISA    \ Data direction. 0: Output       1: Input       (default)
+$BF886020 constant PORTA    \ Port,  to read electrical state of pins or to write latch value
+$BF886030 constant LATA     \ Latch, contains the desired output state for the pins
+$BF886040 constant ODCA
+$BF886050 constant CNPUA
+$BF886060 constant CNPDA
+$BF886070 constant CNCONA
+$BF886080 constant CNENA
+$BF886090 constant CNSTATA
+
+\ ------------------------------------------------------------------------------
+\   Timer registers
+\ ------------------------------------------------------------------------------
+
+$BF800600 constant T1CON
+$BF800610 constant TMR1
+$BF800620 constant PR1
+
+\ ------------------------------------------------------------------------------
+\   Interrupt registers
+\ ------------------------------------------------------------------------------
+
+$BF881030 constant IFS0
+$BF881040 constant IFS1
+
+$BF881060 constant IEC0
+$BF881070 constant IEC1
+
+$BF8810A0 constant IPC1
+
+\ ------------------------------------------------------------------------------
+\   Timer without interrupts
+\ ------------------------------------------------------------------------------
+
+: run-timer ( -- )
+  $FFFF PR1 !                   \ Overflow on $FFFF
+  $8000 %11 4 lshift or T1CON ! \ ON, 1:256 prescaler
+  begin
+    TMR1 @ hex. cr
+  key? until
+;
+
+\ ------------------------------------------------------------------------------
+\   Timer with interrupts
+\ ------------------------------------------------------------------------------
+
+1 1 lshift constant led \ LED on RPA1
+
+: timer-irq-handler ( -- )
+
+  led LATA INV + ! \ Toggle LED state
+  $10 IFS0 CLR + ! \ Clear timer interrupt pending flag
+;
+
+: init-timer ( -- )
+
+  led ANSELA CLR + !  \ Switch LED pin to digital mode
+  led LATA   CLR + !  \ Start with low
+  led TRISA  CLR + !  \ Set LED pin as output
+
+  ['] timer-irq-handler irq-collection !
+
+  $FFFF PR1 !                   \ Overflow on $FFFF
+  $8000 %11 4 lshift or T1CON ! \ ON, 1:256 prescaler
+
+  \ Disable interrupt and clear interrupt flag.
+  $10 IEC0 CLR + !
+  $10 IFS0 CLR + !
+
+  \ Disable and clear all interrupt sources instead.
+  \ 0 IEC0 ! 0 IEC1 !
+  \ 0 IFS0 ! 0 IFS1 !
+
+  \ Set interrupt priorities.
+  %10010 IPC1 SET + !
+
+  \ Enable interrupt.
+  $10 IEC0 SET + !
+
+  \ Enable global interrupts in CP0 status.
+  eint
+;

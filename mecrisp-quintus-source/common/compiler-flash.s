@@ -459,7 +459,7 @@ compiletoram:
   # Befinde mich im Flash. Prüfe auf Kollisionen der Variablen mit dem RAM-Dictionary und schalte um !
   laf x14, Dictionarypointer
   lw x15,  4(x14) # ZweitDictionaryPointer
-  lw x14, 14(x14) # VariablenPointer
+  lw x14, 16(x14) # VariablenPointer
 
   bltu x15, x14, Zweitpointertausch
    writeln " Variables collide with dictionary"

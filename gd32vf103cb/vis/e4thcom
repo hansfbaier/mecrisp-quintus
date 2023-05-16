@@ -1,0 +1,3 @@
+/etc/alternatives/x-terminal-emulator \
+-e "e4thcom '-t mecrisp-st -b B115200 -p LoganNano:GD32:QUINTUS -d ttyUSB0 ' "
+

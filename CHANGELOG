@@ -277,3 +277,35 @@
   - New target: ULX3S
   - Added SDRAM controller together with Icarus timing simulation
   - Paint on a 8x8 LED matrix demo for HX1K Icestick
+
+14.09.2022, Matthias Koch, Mecrisp-Quintus 0.38 experimental:
+
+  - Fixed misalignment bug in core that led to "Variables collide with dictionary" message
+
+  - Full support for interrupts on MIPS
+  - Fixed bug in create on MIPS targets
+  - Improved PIC32MX270F256B target, added interrupt handling, and
+    switched terminal to RPB13 (RX, pin 24) and RPB15 (TX, pin 26)
+  - Added missing three register mul opcode to MIPS disassembler and quintusemu
+
+  - Removed weird PIC32MX570 board that never got fully usable with FOSS tools
+
+  - Contribution by Manfred Mahlow:
+      Update of the VIS extension to 0.8.4.2
+
+                     ____
+                    /\   \
+                   /  \___\
+                  _\  / __/_
+                 /\ \/_/\   \
+                /  \__/  \___\
+               _\  /  \  / __/_
+              /\ \/___/\/_/\   \
+             /  \___\    /  \___\
+            _\  /   /_  _\__/ __/_
+           /\ \/___/  \/\   \/\   \
+          /  \___\ \___\ \___\ \___\
+          \  /   / /   / /   / /   /
+           \/___/\/___/\/___/\/___/  Veronica Karlsson
+
+    We are very close to the 1.0.0 release now!

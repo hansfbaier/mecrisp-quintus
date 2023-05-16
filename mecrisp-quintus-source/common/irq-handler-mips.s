@@ -17,6 +17,7 @@
 #
 
 # Interrupt handler for MIPS
+# Also see mips-v.s for MIPS <-> RISC-V register assignment
 
 .macro initinterrupt Name, Asmname, Routine
 
@@ -31,45 +32,70 @@
 
 \Asmname:
 
-  addi sp, sp, -13*4
+  addiu sp, sp, -16*4
 
-  sw x1,   12*4(sp)  # Required for Forth core...
-  sw x14,  11*4(sp)
-  sw x15,  10*4(sp)
+  .set noat
+  sw  $1, 0*4(sp) # Assembler uses register $1 for temporary constructs
+  laf $1, irq_hook_\Name
+  .set at
 
-  sw x16,  9*4(sp)  # Required for Acrobatics only...
-  sw x17,  8*4(sp)
-  sw x18,  7*4(sp)
-  sw x19,  6*4(sp)
-  sw x20,  5*4(sp)
-  sw x21,  4*4(sp)
-  sw x22,  3*4(sp)
-  sw x23,  2*4(sp)
-  sw x24,  1*4(sp)
-  sw x25,  0*4(sp)
-
-  laf x15, irq_hook_\Name
-  lw x15, 0(x15)
-  jr x15
-
-  lw x1,  12*4(sp)
-  lw x14, 11*4(sp)
-  lw x15, 10*4(sp)
-
-  lw x16,  9*4(sp)
-  lw x17,  8*4(sp)
-  lw x18,  7*4(sp)
-  lw x19,  6*4(sp)
-  lw x20,  5*4(sp)
-  lw x21,  4*4(sp)
-  lw x22,  3*4(sp)
-  lw x23,  2*4(sp)
-  lw x24,  1*4(sp)
-  lw x25,  0*4(sp)
-
-  addi sp, sp, 13*4
-
-  eret
+  j irq_common
 
 .endm
 
+#------------------------------------------------------------------------------
+irq_common: # Common framework for all interrupt entries
+#------------------------------------------------------------------------------
+
+  sw x1,   1*4(sp) # Required for Forth core...
+  sw x14,  2*4(sp)
+  sw x15,  3*4(sp)
+
+  mflo x15         # Required for multiplication...
+  sw x15,  4*4(sp)
+  mfhi x15
+  sw x15,  5*4(sp)
+
+  sw x16,  6*4(sp) # Required for Acrobatics only...
+  sw x17,  7*4(sp)
+  sw x18,  8*4(sp)
+  sw x19,  9*4(sp)
+  sw x20, 10*4(sp)
+  sw x21, 11*4(sp)
+  sw x22, 12*4(sp)
+  sw x23, 13*4(sp)
+  sw x24, 14*4(sp)
+  sw x25, 15*4(sp)
+
+  .set noat
+  lw $1, 0($1)
+  jalr $1
+  .set at
+
+  lw x25, 15*4(sp) # Required for Acrobatics only...
+  lw x24, 14*4(sp)
+  lw x23, 13*4(sp)
+  lw x22, 12*4(sp)
+  lw x21, 11*4(sp)
+  lw x20, 10*4(sp)
+  lw x19,  9*4(sp)
+  lw x18,  8*4(sp)
+  lw x17,  7*4(sp)
+  lw x16,  6*4(sp)
+
+  lw x15,  5*4(sp) # Required for multiplication...
+  mthi x15
+  lw x15,  4*4(sp)
+  mtlo x15
+
+  lw x15,  3*4(sp) # Required for Forth core...
+  lw x14,  2*4(sp)
+  lw x1,   1*4(sp)
+
+  .set noat
+  lw $1,   0*4(sp) # Assembler uses register $1 for temporary constructs
+  .set at
+
+  addiu sp, sp, 16*4
+
+  eret

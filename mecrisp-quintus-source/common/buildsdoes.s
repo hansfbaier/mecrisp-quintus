@@ -197,7 +197,7 @@ builds: # Brother of does> that creates a new definition and leaves space to ins
   # Copy of the inline-code of does>
   pushdatos
   .ifdef mipscore
-    laf x15, dodoes
+    la x15, dodoes
     jalr x8, x15
   .else
     lui x15, %hi(dodoes)

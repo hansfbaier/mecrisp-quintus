@@ -1,0 +1,37 @@
+\     Filename: bowse  -->  vis-browse-21.1-mq.fs  
+\     Purpose: Loader for a dictionary browser that shows VOCabularies in a 
+\              non-tabular stile. Adds the words  ?? ( -- ) and  browse ( -- ) 
+\              to the root VOCabulary. 
+\    Required: Mecrisp-Quintus >= 0.27
+\              vis-x.y.z-mecrisp-quintus.fs  >= 0.8.4
+\         MCU: * , tested with Logan Nano (GD32)
+\       Board: * , tested with Logan Nano
+\ Recommended: e4thcom Terminal
+\      Author: manfred.mahlow@forth-ev.de
+\    Based on: -
+\     Licence: GPLv3
+\   Changelog: 2021-03-01 
+
+#include vis-browse-21.1-mq.fs
+
+{ Glossary :  browse
+--------------------------------------------------------------------------------
+
+  [<voc>] browse ( -- ) S
+          Displays all words of the top entry of the active search order. Words
+          in RAM come first, if any.
+          It's a StICKY word that does not change the search order.
+
+  [<voc>] ?? ( -- ) S,I
+          A dictionary browser that displays the actual Forth state and context.
+          It's a STICKY and IMMEDIATE word.
+
+  Hints:  Use  [<voc>] words  to display a VOCabulary in the tabular form.
+
+          Press the Enter key to stop a VOCabulary listing.
+
+          Use  \words  to see the Mecrisp-Quintus dictionary without VOCabulary
+                       structure.
+--------------------------------------------------------------------------------
+}
+

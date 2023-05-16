@@ -37,7 +37,7 @@ stty -icanon -echo
 
 {
    echo -e "compiletoflash\n"
-   cat ../common/VIS/vis-0.8.4-mecrisp-quintus.fs
+   cat ../common/VIS/vis-0.8.4.2-mecrisp-quintus.fs
    echo -e "compiletoflash\n"
    cat ../common/VIS/vis-disassembler-rv32imc.fs
    echo -e "compiletoram\n"

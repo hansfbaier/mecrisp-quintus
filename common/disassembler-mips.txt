@@ -259,7 +259,7 @@
   ( 25 )
   ( 26 )
   ( 27 )
-  ( 28 )
+    28 of inst %111111 and 2 = if ." mul" disasm-r-3reg then endof
   ( 29 )
   ( 30 )
   ( 31 )

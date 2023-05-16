@@ -12,6 +12,7 @@ CSRs for GD32VF103 by Wolfgang Strauss
 Interrupts on GD32VF103 by Wolfgang Strauss
 Conditional compilation, Forth 200x style by Manfred Mahlow
 Femtosoc and the FemtoRV32 processor for HX1K by Bruno Levy
+ASCII Art by Veronica Karlsson
 
 Hardware donations:
 
@@ -19,6 +20,7 @@ SiFive
 Klaus Kohl-Schöpe
 Ulrich Hoffmann
 Jürgen Pintaske
+Paul Boddie
 
 Testing and hints in alphabetical order:
 

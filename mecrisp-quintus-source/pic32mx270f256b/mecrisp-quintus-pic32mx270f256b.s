@@ -23,7 +23,7 @@
 .set reorder # Assembler takes care of inserting NOPs into the delay slots
              # if the instruction before cannot be swapped with the jump opcode.
 
-.include "../common/mips-v.s"
+.include "../common/mips-v.s" # Twist MIPS assembler to accept RISC-V style
 
 # -----------------------------------------------------------------------------
 # Swiches for capabilities of this chip
@@ -49,51 +49,56 @@
 .equ FlashDictionaryAnfang, FlashAnfang + 0x8000 # 32 kb reserved for core.
 .equ FlashDictionaryEnde,   FlashEnde
 
-# ---------------------------------------------------------------------------
-# Configuration bits area
-# Internal FRC oscillator, PLL makes it 48MHz, CLKO is enabled, PBCLK = 24MHz
 # -----------------------------------------------------------------------------
-
-.section .devcfg3, "a", @progbits
-            .word 0xCFFFFFFF
-.section .devcfg2, "a", @progbits
-            .word 0xFFF979F9
-.section .devcfg1, "a", @progbits
-            .word 0xFF7FDAD9
-.section .devcfg0, "a", @progbits
-            .word 0x7FFFFFFB
-
-
-
-
-# ----------------------------------------------------------------------
-# Boot flash area for low-level memory initialisation
-# You do not need this if you are loading something with a bootloader
-# ----------------------------------------------------------------------
+# Boot flash area for low-level initialisation and device configuration
+# -----------------------------------------------------------------------------
 
 .section .boot, "ax"
 
-        .align 2
-        .globl _reset
-        .set noreorder
-        .ent _reset
-_reset:
+  j Reset
 
-        ##################################################################
-        # Call main.
-        #
-        #################################################################
-        j Reset
-        nop
-        .end _reset
+# -----------------------------------------------------------------------------
+# Configuration bits at the end of the boot flash area
+# Internal FRC oscillator, PLL makes it 48MHz, CLKO is enabled, PBCLK = 24MHz
+# -----------------------------------------------------------------------------
+
+.org 0xBF0
+
+  .word 0xCFFFFFFF # DEVCFG3
+  .word 0xFFF979F9 # DEVCFG2
+  .word 0xFF7FDAD9 # DEVCFG1
+  .word 0x7FFFFFFB # DEVCFG0
 
 # -----------------------------------------------------------------------
 # Core start
 # -----------------------------------------------------------------------
 
-        .text
-        .align 2
-        .set reorder
+.text
+
+handler_base: /* TLB error servicing. */
+  j irq_fault
+
+.org 0x180 /* General exception servicing. */
+  j irq_fault
+
+.org 0x200 /* Interrupt servicing. */
+
+  # Single vector for all interrupts:
+  j irq_collection
+
+# # Multi-vectored mode:
+# # Every vector needs 32 bytes and we have 64 interrupt sources.
+# .rept 64
+# j irq_collection
+# nop
+# nop
+# nop
+# nop
+# nop
+# nop
+# nop
+# .endr
+
 # -----------------------------------------------------------------------
 # Include the Forth core of Mecrisp-Quintus and SFRs from Microchip
 # -----------------------------------------------------------------------
@@ -106,16 +111,13 @@ Reset: # Forth begins here
 # -----------------------------------------------------------------------
 
   call memory_init          # terminal.s
-  call uart_init            # terminal.s
-
-  Debug_Terminal_Init
 
   .include "../common/catchflashpointers.s"
 
+  call uart_init            # terminal.s
+  call interrupt_init       # interrupts.s
 
   welcome " for PIC32MX270F256B by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"
-
-# vim: set shiftwidth=2:

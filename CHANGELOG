@@ -341,3 +341,9 @@
 
   - Contribution by Hans Baier:
       New target: CH56X
+
+01.03.2023, Matthias Koch, Mecrisp-Quintus 1.0.4
+
+  - Fixed a flaw in the smaller Verilog UARTs
+  - Faster software multiplication for RV32I
+  - Improved logic for Nandland Go

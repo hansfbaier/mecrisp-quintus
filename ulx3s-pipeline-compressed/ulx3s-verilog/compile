@@ -15,7 +15,7 @@ if
   yosys  -q -p "synth_ecp5 -top ulx3s -json build/ulx3s.json -abc2 -abc9 -no-rw-check" ulx3s.v;
 then
   echo "Place and Route..."
-  nextpnr-ecp5 --85k --package CABGA381 --json build/ulx3s.json --lpf ulx3s_v20.lpf --textcfg build/ulx3s.config --ignore-loops
+  nextpnr-ecp5 --85k --package CABGA381 --json build/ulx3s.json --lpf ulx3s_v20.lpf --textcfg build/ulx3s.config --ignore-loops --seed 31
 
   echo "Create Bitstream..."
   ecppack --compress --input build/ulx3s.config --bit ulx3s.bin

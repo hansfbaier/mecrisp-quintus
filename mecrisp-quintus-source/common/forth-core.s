@@ -247,7 +247,7 @@ ramallot Eingabepuffer, Maximaleeingabe  # Eingabepuffer wird einen Adresse-Län
 .macro welcome Meldung
   call dotgaensefuesschen
         .byte 8f - 7f         # Compute length of string.
-7:      .ascii "Mecrisp-Quintus 1.0.3\Meldung\n"
+7:      .ascii "Mecrisp-Quintus 1.0.4\Meldung\n"
 
 .ifdef compressed_isa
 8:  .balign 2, 0      # Realign
@@ -268,7 +268,7 @@ CoreDictionaryAnfang: # Dictionary-Einsprungpunkt setzen
 .set CoreVariablenPointer, RamDictionaryEnde # Im Flash definierte Variablen kommen ans RAM-Ende
                                              # Variables defined in Flash are placed at the end of RAM
 
-  Definition Flag_invisible, "--- Mecrisp-Quintus 1.0.3 ---"
+  Definition Flag_invisible, "--- Mecrisp-Quintus 1.0.4 ---"
 
 .include "flash.s"
 

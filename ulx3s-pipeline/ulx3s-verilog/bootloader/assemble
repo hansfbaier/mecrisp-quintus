@@ -1,0 +1,10 @@
+#!/bin/sh
+
+riscv64-linux-gnu-as bootloader.s -o bootloader.o -march=rv32im
+riscv64-linux-gnu-ld -o bootloader.elf -T memmap bootloader.o -m elf32lriscv
+riscv64-linux-gnu-objdump -Mnumeric -D bootloader.elf > bootloader.list
+riscv64-linux-gnu-objcopy bootloader.elf bootloader.bin -O binary
+hexdump -ve '1/4 "%08X\n"' bootloader.bin > bootloader.hex
+
+rm -f *.o *.elf # *.bin
+

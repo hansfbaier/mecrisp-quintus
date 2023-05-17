@@ -12,7 +12,7 @@ then
   nextpnr-ecp5 --85k --package CABGA381 --json build/ulx3s.json --lpf ulx3s_v20.lpf --textcfg build/ulx3s.config --ignore-loops
 
   echo "Create Bitstream..."
-  ecppack --input build/ulx3s.config --bit ulx3s.bin
+  ecppack --compress --input build/ulx3s.config --bit ulx3s.bin
 
   echo "Finished."
 fi

@@ -1,0 +1,160 @@
+
+--------------------------------------------------------------------------------
+  RISC-V on FPGA
+--------------------------------------------------------------------------------
+
+This folder contains firmware examples both in assembler and C that run
+on the same RISC-V RV32IMC "microcontroller" design as Mecrisp-Quintus,
+intended for the Icebreaker (Lattice UP5K) board, based on the
+FemtoRV32-Gracilis written by Bruno Levy and Matthias Koch:
+
+https://github.com/BrunoLevy/learn-fpga/
+https://github.com/BrunoLevy/learn-fpga/blob/master/FemtoRV/RTL/PROCESSOR/femtorv32_gracilis.v
+
+Peripherals included:
+
+  - Random number generator
+  - GPIO registers for PMOD pin access
+  - Timer tick interrupt
+  - LEDs
+  - UART terminal, 115200 Baud 8N1 LF
+  - SPI flash memory accessible through XIP (eXecute In Place)
+
+How to flash the bitstream:
+
+iceprog icebreaker.bin
+
+Choose one of the firmware images:
+
+iceprog -o 128k tinyblinky/tinyblinky.bin
+iceprog -o 128k interrupt/interrupt.bin
+iceprog -o 128k hello_gcc/hello_gcc.bin
+iceprog -o 128k picolib_gcc/picolib_gcc.bin
+
+How to communicate:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 400 -n"
+  or
+./terminal
+
+The board has a dedicated Reset button.
+
+Processor runs at 12 MHz and everything is copied to RAM for fast execution.
+
+--------------------------------------------------------------------------------
+  Memory map
+--------------------------------------------------------------------------------
+
+$00000000 - $0001FFFF: 128 kb RAM
+$00400000 - $004FFFFF: IO registers
+$00800000 - $008FFFFF: SPI Flash memory, XIP, slow
+
+--------------------------------------------------------------------------------
+  IO Registers
+--------------------------------------------------------------------------------
+
+$400010 constant port-in    [24] Random bit [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400020 constant port-out                   [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400040 constant port-dir                   [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400080 constant port-leds                                              [1:0] Two LEDs
+
+$410000 constant uart-data   [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$420000 constant uart-status [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+$440000 constant ticks       Timer ticks, generates interrupt on overflow from $FFFFFFFF
+$480000 constant reload      Timer reload value on overflow
+
+The IO registers have atomic clear/set/toggle capability:
+
+  Address +  0 : Normal write
+  Address +  4 : Clear bits
+  Address +  8 : Set bits
+  Address + 12 : Toggle bits
+
+The ticks counter counts up, triggers an interrupt on overflow and
+loads the value from the reload register, which defaults to 0.
+
+--------------------------------------------------------------------------------
+  Example firmware
+--------------------------------------------------------------------------------
+
+Tinyblinky:
+
+  A little blinky in RISC-V assembler. A nice "hello world" project.
+
+Interrupt:
+
+  An example on how to use interrupts on RISC-V, including notes
+  on compressed opcodes and small tools for printing hex numbers,
+  useful for debugging.
+
+Hello GCC:
+
+  A small project in C featuring serial terminal, random numbers and LEDs.
+
+Picolib GCC:
+
+  Similiar to Hello GCC, but using C standard library Picolibc.
+
+--------------------------------------------------------------------------------
+  Docs on RISC-V itself
+--------------------------------------------------------------------------------
+
+Instruction set quick reference, recommended:
+
+  http://www.riscvbook.com/greencard-20181213.pdf
+
+Complete specifications:
+
+  https://riscv.org/technical/specifications/
+
+See `Volume 1, Unprivileged Spec` for instruction set,
+and `Volume 2, Privileged Spec` for interrupt infrastructure.
+
+--------------------------------------------------------------------------------
+  Get RISC-V assembler
+--------------------------------------------------------------------------------
+
+The GNU binutils for RISC-V include the assembler.
+
+Unlike as for the FPGA tools that change rapidly,
+you can just have a look for binary packages in your distribution.
+
+For Debian 11 Stable "Bullseye", one gets using
+
+  apt-cache search binutils | grep riscv
+
+binutils-riscv64-linux-gnu - GNU binary utilities, for riscv64-linux-gnu target
+binutils-riscv64-linux-gnu-dbg - GNU binary utilities, for riscv64-linux-gnu target (debug symbols)
+binutils-riscv64-unknown-elf - GNU assembler, linker and binary utilities for RISC-V processors
+
+Both binutils-riscv64-linux-gnu and binutils-riscv64-unknown-elf are fine,
+but you might have to adjust the actual invocations to the tools depending
+on which package(s) you actually installed.
+
+Despite the names, these also support 32 bit RISC-V targets.
+
+--------------------------------------------------------------------------------
+  How to synthesise the FPGA bitstream
+--------------------------------------------------------------------------------
+
+The easiest way to install the tools needed to synthesise bitstreams
+for the Lattice iCE40 and ECP5 family FPGAs is oss-cad-suite:
+
+https://github.com/YosysHQ/oss-cad-suite-build/releases
+
+You can also build Yosys, Icestorm, and NextPNR from source.
+
+https://github.com/YosysHQ/yosys/
+https://github.com/YosysHQ/icestorm
+https://github.com/YosysHQ/nextpnr/
+
+Do not try to install packaged Yosys/NextPNR/Icestorm tools that might come
+with your distro – the toolchain is advancing very, very quick, and if your
+distro packaged it three months ago, it is already heavily outdated.
+The ones in Debian Stable – Ouch!
+
+If you choose the precompiled oss-cad-suite, enter the environment with
+
+source ~/path/to/oss-cad-suite/environment
+
+Run rtl/compile script for synthesis.

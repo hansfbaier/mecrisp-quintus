@@ -319,3 +319,10 @@
   - Removed old PicoRV based Icebreaker port
   - Added binary with included acrobatics compiler for Icebreaker
   - Fixed alignment issues with inline cache access in acrobatics compiler
+
+07.11.2022, Matthias Koch, Mecrisp-Quintus 1.0.1
+
+  - New target: ULX3S-Pipeline, featuring FemtoRV32-Pegasus
+    with single cycle instruction execution (except for div&rem)
+
+  - Added firmware examples in assembler and C for the Icebreaker design

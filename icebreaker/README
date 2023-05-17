@@ -1,6 +1,6 @@
 
 --------------------------------------------------------------------------------
-Mecrisp-Quintus for HX1K Icestick, containing FemtoRV32-Gracilis (RV32IMC).
+Mecrisp-Quintus for UP5K Icebreaker, containing FemtoRV32-Gracilis (RV32IMC).
 --------------------------------------------------------------------------------
 
 The included bitstream contains a FemtoRV32-Gracilis core which is synthesised

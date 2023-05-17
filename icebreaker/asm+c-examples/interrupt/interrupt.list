@@ -1,0 +1,144 @@
+
+interrupt.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <Reset-0x1a>:
+   0:	00000417          	auipc	x8,0x0
+   4:	4481                	li	x9,0
+   6:	00020537          	lui	x10,0x20
+   a:	400c                	lw	x11,0(x8)
+   c:	c08c                	sw	x11,0(x9)
+   e:	0411                	addi	x8,x8,4
+  10:	0491                	addi	x9,x9,4
+  12:	1571                	addi	x10,x10,-4
+  14:	f97d                	bnez	x10,a <CYCLES_US-0x2>
+  16:	01a00067          	jr	26(x0) # 0 <CYCLES_US-0xc>
+
+0000001a <Reset>:
+  1a:	00020137          	lui	x2,0x20
+  1e:	00000517          	auipc	x10,0x0
+  22:	04250513          	addi	x10,x10,66 # 60 <interrupt>
+  26:	30551073          	csrw	mtvec,x10
+  2a:	4f81                	li	x31,0
+  2c:	fc6c8537          	lui	x10,0xfc6c8
+  30:	90050513          	addi	x10,x10,-1792 # fc6c7900 <timer_reload+0xfc247900>
+  34:	004405b7          	lui	x11,0x440
+  38:	c188                	sw	x10,0(x11)
+  3a:	ffc0d537          	lui	x10,0xffc0d
+  3e:	42050513          	addi	x10,x10,1056 # ffc0d420 <timer_reload+0xff78d420>
+  42:	004805b7          	lui	x11,0x480
+  46:	c188                	sw	x10,0(x11)
+  48:	30046073          	csrsi	mstatus,8
+
+0000004c <insight>:
+  4c:	4429                	li	x8,10
+  4e:	2051                	jal	d2 <serial_emit>
+  50:	00b72437          	lui	x8,0xb72
+  54:	b0040413          	addi	x8,x8,-1280 # b71b00 <timer_reload+0x6f1b00>
+  58:	20d1                	jal	11c <delay_cycles>
+  5a:	847e                	mv	x8,x31
+  5c:	2815                	jal	90 <hexprint>
+  5e:	b7fd                	j	4c <insight>
+
+00000060 <interrupt>:
+  60:	1171                	addi	x2,x2,-4
+  62:	c006                	sw	x1,0(x2)
+  64:	1171                	addi	x2,x2,-4
+  66:	c02a                	sw	x10,0(x2)
+  68:	1171                	addi	x2,x2,-4
+  6a:	c02e                	sw	x11,0(x2)
+  6c:	0f85                	addi	x31,x31,1
+  6e:	001fd513          	srli	x10,x31,0x1
+  72:	01f54533          	xor	x10,x10,x31
+  76:	004005b7          	lui	x11,0x400
+  7a:	08058593          	addi	x11,x11,128 # 400080 <leds>
+  7e:	c188                	sw	x10,0(x11)
+  80:	4582                	lw	x11,0(x2)
+  82:	0111                	addi	x2,x2,4
+  84:	4502                	lw	x10,0(x2)
+  86:	0111                	addi	x2,x2,4
+  88:	4082                	lw	x1,0(x2)
+  8a:	0111                	addi	x2,x2,4
+  8c:	30200073          	mret
+
+00000090 <hexprint>:
+  90:	1171                	addi	x2,x2,-4
+  92:	c006                	sw	x1,0(x2)
+  94:	1171                	addi	x2,x2,-4
+  96:	c02a                	sw	x10,0(x2)
+  98:	1171                	addi	x2,x2,-4
+  9a:	c02e                	sw	x11,0(x2)
+  9c:	1171                	addi	x2,x2,-4
+  9e:	c032                	sw	x12,0(x2)
+  a0:	8522                	mv	x10,x8
+  a2:	02000593          	li	x11,32
+  a6:	01c55413          	srli	x8,x10,0x1c
+  aa:	883d                	andi	x8,x8,15
+  ac:	4629                	li	x12,10
+  ae:	00c46363          	bltu	x8,x12,b4 <hexprint+0x24>
+  b2:	041d                	addi	x8,x8,7
+  b4:	03040413          	addi	x8,x8,48
+  b8:	2829                	jal	d2 <serial_emit>
+  ba:	0512                	slli	x10,x10,0x4
+  bc:	15f1                	addi	x11,x11,-4
+  be:	f5e5                	bnez	x11,a6 <hexprint+0x16>
+  c0:	4602                	lw	x12,0(x2)
+  c2:	0111                	addi	x2,x2,4
+  c4:	4582                	lw	x11,0(x2)
+  c6:	0111                	addi	x2,x2,4
+  c8:	4502                	lw	x10,0(x2)
+  ca:	0111                	addi	x2,x2,4
+  cc:	4082                	lw	x1,0(x2)
+  ce:	0111                	addi	x2,x2,4
+  d0:	8082                	ret
+
+000000d2 <serial_emit>:
+  d2:	1171                	addi	x2,x2,-4
+  d4:	c02a                	sw	x10,0(x2)
+  d6:	1171                	addi	x2,x2,-4
+  d8:	c02e                	sw	x11,0(x2)
+  da:	00420537          	lui	x10,0x420
+  de:	410c                	lw	x11,0(x10)
+  e0:	2005f593          	andi	x11,x11,512
+  e4:	fded                	bnez	x11,de <serial_emit+0xc>
+  e6:	00410537          	lui	x10,0x410
+  ea:	c100                	sw	x8,0(x10)
+  ec:	4582                	lw	x11,0(x2)
+  ee:	0111                	addi	x2,x2,4
+  f0:	4502                	lw	x10,0(x2)
+  f2:	0111                	addi	x2,x2,4
+  f4:	8082                	ret
+
+000000f6 <serial_key>:
+  f6:	1171                	addi	x2,x2,-4
+  f8:	c02a                	sw	x10,0(x2)
+  fa:	1171                	addi	x2,x2,-4
+  fc:	c02e                	sw	x11,0(x2)
+  fe:	00420537          	lui	x10,0x420
+ 102:	410c                	lw	x11,0(x10)
+ 104:	1005f593          	andi	x11,x11,256
+ 108:	dded                	beqz	x11,102 <serial_key+0xc>
+ 10a:	00410537          	lui	x10,0x410
+ 10e:	00054403          	lbu	x8,0(x10) # 410000 <uart_data>
+ 112:	4582                	lw	x11,0(x2)
+ 114:	0111                	addi	x2,x2,4
+ 116:	4502                	lw	x10,0(x2)
+ 118:	0111                	addi	x2,x2,4
+ 11a:	8082                	ret
+
+0000011c <delay_cycles>:
+ 11c:	1171                	addi	x2,x2,-4
+ 11e:	c02a                	sw	x10,0(x2)
+ 120:	1171                	addi	x2,x2,-4
+ 122:	c02e                	sw	x11,0(x2)
+ 124:	c00025f3          	rdcycle	x11
+ 128:	c0002573          	rdcycle	x10
+ 12c:	8d0d                	sub	x10,x10,x11
+ 12e:	fe856de3          	bltu	x10,x8,128 <delay_cycles+0xc>
+ 132:	4582                	lw	x11,0(x2)
+ 134:	0111                	addi	x2,x2,4
+ 136:	4502                	lw	x10,0(x2)
+ 138:	0111                	addi	x2,x2,4
+ 13a:	8082                	ret

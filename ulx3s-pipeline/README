@@ -1,0 +1,78 @@
+
+--------------------------------------------------------------------------------
+Mecrisp-Quintus for ULX3S, containing FemtoRV32-Pegasus (RV32IM).
+--------------------------------------------------------------------------------
+
+The included bitstream contains a FemtoRV32-Pegasus core which is synthesised
+with 256 kb RAM, hardware multiply & divide and single cycle per instruction
+(CPI=1) operation except for divide & remainder which take 34 cycles.
+
+See https://github.com/BrunoLevy/learn-fpga
+and https://github.com/BrunoLevy/learn-fpga/tree/master/FemtoRV/RTL/PROCESSOR
+
+How to flash:
+
+openFPGALoader --board=ulx3s --write-flash ulx3s.bin
+openFPGALoader --board=ulx3s --write-flash -o 0x200000 --file-type bin mecrisp-quintus-ulx3s-with-tools.bin
+
+How to communicate:
+
+Open terminal with 115200 baud 8N1 and press the button labeled "PWR" next to the SDRAM to reset.
+
+picocom -b 115200 /dev/ttyUSB0 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 200 -n"
+
+Processor runs at 25 MHz and everything is copied to dualport RAM which is the only executable location.
+
+You can also run the binary in emulator:
+
+./quintusemu-ulx3s mecrisp-quintus-ulx3s-with-tools.bin
+
+--------------------------------------------------------------------------------
+
+Memory map:
+
+$00000000 - $0003FFFF: RWX 256 kb RAM, containing mirrored flash contents
+$40000000 - $7FFFFFFF: RW  Peripheral register area
+$80000000 - $80FFFFFF: RO  SPI Flash memory, slow, not executable
+$C0000000 - $C3FFFFFF: RW  64 MB SDRAM,            not executable
+
+--------------------------------------------------------------------------------
+
+IO Registers:
+
+$40000010 constant porta-in   [27:0] "Positive" pin row
+$40000020 constant porta-out            ...
+$40000040 constant porta-dir            ...
+$40000080 constant leds-out    [7:0] Eight LEDs (BGORBGOR)
+
+$40000100 constant portb-in   [27:0] "Negative" pin row
+$40000200 constant portb-out            ...
+$40000400 constant portb-dir            ...
+$40000800 constant buttons       [6] Random bit [5:0] Buttons
+
+$40001000 constant oled-in     [4:0] {oled_csn, oled_dc, oled_resn, oled_mosi, oled_clk}
+$40002000 constant oled-out             ...
+$40004000 constant oled-dir             ...
+$40008000 constant analog-out [11:8] V DAC [7:4] R DAC [3:0] L DAC
+
+$40010000 constant uart-data     [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$40020000 constant uart-status   [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+$40040000 constant ticks         Timer ticks, generates interrupt on overflow from $FFFFFFFF
+$40080000 constant reload        Timer reload value on overflow
+
+$40100000 constant adc-in        [0]                     adc_miso
+$40200000 constant adc-out     [2:0] {adc_csn, adc_sclk, adc_mosi}
+$40400000 constant sd-in         [0]                       sd_d0
+$40800000 constant sd-out      [2:0] {  sd_d3,   sd_clk,   sd_cmd}
+
+The IO registers have atomic clear/set/toggle capability:
+
+  Address +  0 : Normal write
+  Address +  4 : Clear bits
+  Address +  8 : Set bits
+  Address + 12 : Toggle bits
+
+The ticks counter counts up, triggers an interrupt on overflow and
+loads the value from the reload register, which defaults to 0.
+
+--------------------------------------------------------------------------------

@@ -51,8 +51,8 @@ module MappedSPIFlash(
 
    parameter DUMMY_CYCLES = 8;
 
-   reg [6:0]  clock_cnt; // send/receive clock, 2 bits per clock (dual IO)
-   reg [39:0] shifter;   // used for sending and receiving
+   reg [6:0]  clock_cnt = 7'b1000000; // send/receive clock, 2 bits per clock (dual IO)
+   reg [39:0] shifter   = 0;          // used for sending and receiving
 
    assign  rbusy  = ~clock_cnt[6];
    assign  CS_N   =  clock_cnt[6];

@@ -1,0 +1,15 @@
+
+bootloader.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+80000000 <.text>:
+80000000:	80220437          	lui	x8,0x80220
+80000004:	000204b7          	lui	x9,0x20
+80000008:	ffc40413          	addi	x8,x8,-4 # 0x8021fffc
+8000000c:	ffc48493          	addi	x9,x9,-4 # 0x1fffc
+80000010:	00042503          	lw	x10,0(x8)
+80000014:	00a4a023          	sw	x10,0(x9)
+80000018:	fe0498e3          	bnez	x9,0x80000008
+8000001c:	00000067          	jr	x0 # 0x0

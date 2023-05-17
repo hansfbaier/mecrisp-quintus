@@ -629,6 +629,7 @@ Deep insights:
         literal,        ( u|n -- ) Compiles a literal with runtime
         inline,         ( a-addr -- ) Inlines the choosen subroutine
         call,           ( a-addr -- ) Compiles a call to a subroutine
+        ret,            ( -- ) Compiles a ret opcode
 
         flashvar-here   ( -- a-addr ) Gives current RAM management pointer
         dictionarystart ( -- a-addr ) Current entry point for dictionary search
@@ -659,6 +660,8 @@ RISC-V with compressed instruction support only:
                                collected flags to flash and
                                takes care of proper ending
         inline          ( -- ) Makes current definition inlineable.
+                               For flash, place it inside your definition !
+        noframe         ( -- ) No need to push/pop link register when compiling this definition.
                                For flash, place it inside your definition !
         immediate       ( -- ) Makes current definition immediate.
                                For flash, place it inside your definition !

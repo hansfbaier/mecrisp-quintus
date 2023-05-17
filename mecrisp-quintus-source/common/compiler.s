@@ -312,66 +312,41 @@ inlinekomma:
 
   .ifdef mipscore
 
-# Original:
-#       push_x1_x10
-#
-#     1:lw x10, 0(x8)
-#       li x15, 0x03e00008 # Ret-Opcode
-#       beq x10, x15, 2f
-#
-#         pushda x10
-#         call komma
-#         addi x8, x8, 4
-#         j 1b
-#
-#     2:lw x8, 4(x8) # Check branch delay slot for an additional opcode.
-#       beq x8, zero, 3f
-#
-#         call komma
-#         j 4f
-#
-#     3:drop
-#     4:pop_x1_x10
-#       ret
+  push x1
 
-# Jetzt mit der Frame-Erkennung, um auch selbstdefiniertes inline einfügen zu können.
+1:# -------------------------------------
 
-  push_x1_x10
-
-  # -------------------------------------
-  lw x10, 0(x8)
+  lw x14, 0(x8)
   li x15, 0x2442FFFC  # addiu $2, $2, FFFC
-  bne x10, x15, 1f
+  bne x14, x15, 2f
 
-    lw x10, 4(x8)
+    lw x14, 4(x8)
     li x15, 0xAC5F0000  # sw $31, 0000($2)
-    bne x10, x15, 1f
+    bne x14, x15, 2f
 
-      addi x8, x8, 8     # Do not inline these if they appear as the first opcodes in a definition
-  # -------------------------------------
+      addi x8, x8, 8     # Do not inline these if they appear in a definition
 
-1:
+2:# -------------------------------------
 
-  # -------------------------------------
-  lw x10, 0(x8)
+  lw x14, 0(x8)
   li x15, 0x8C5F0000  # lw $31, 0000($2)
-  bne x10, x15, 5f
+  bne x14, x15, 2f
 
-    lw x10, 4(x8)
+    lw x14, 4(x8)
     li x15, 0x03E00008  # jr $zero, $31, $zero
-    bne x10, x15, 5f
+    bne x14, x15, 2f
 
-      lw x10, 8(x8)
+      lw x14, 8(x8)
       li x15, 0x24420004  # addiu $2, $2, 0004
-      beq x10, x15, 3f
-5:
-  # -------------------------------------
+      beq x14, x15, 3f
 
-  lw x10, 0(x8)
+2:# -------------------------------------
+
+  lw x14, 0(x8)
   li x15, 0x03e00008 # Ret-Opcode
-  beq x10, x15, 2f
+  beq x14, x15, 2f
 
-    pushda x10
+    pushda x14
     call komma
     addi x8, x8, 4
     j 1b
@@ -383,28 +358,28 @@ inlinekomma:
     j 4f
 
 3:drop
-4:pop_x1_x10
+4:pop x1
   ret
 
   .else
 
   .ifdef compressed_isa
 
-  push_x1_x10_x11
+  push x1
 
-  # -------------------------------------
+1:# -------------------------------------
 
   lhu x15, 0(x8)
   li x14, 0x1171
-  bne x15, x14, 1f
+  bne x15, x14, 2f
 
     lhu x15, 2(x8)
     li x14, 0xC006
-    bne x15, x14, 1f
+    bne x15, x14, 2f
 
-      addi x8, x8, 4 # Do not inline these if they appear as the first opcodes in a definition
+      addi x8, x8, 4 # Do not inline these if they appear in a definition
 
-1:# -------------------------------------
+2:# -------------------------------------
 
   lhu x15, 0(x8)
   li x14, 0x4082
@@ -454,72 +429,52 @@ inlinekomma:
   # -------------------------------------
 
 4:drop
-  pop_x1_x10_x11
+  pop x1
   ret
 
   .else
 
-# Original:
-#       push_x1_x10
-#
-#     1:lw x10, 0(x8)
-#       li x15, 0x00008067 # Ret-Opcode
-#       beq x10, x15, 2f
-#
-#         pushda x10
-#         call komma
-#         addi x8, x8, 4
-#         j 1b
-#
-#     2:drop
-#       pop_x1_x10
-#       ret
+  push x1
 
+1:# -------------------------------------
 
-# Jetzt mit der Frame-Erkennung, um auch selbstdefiniertes inline einfügen zu können.
-
-  push_x1_x10
-
-  # -------------------------------------
-  lw x10, 0(x8)
+  lw x14, 0(x8)
   li x15, 0xFFC10113  # addi   x2, x2, -4
-  bne x10, x15, 1f
+  bne x14, x15, 2f
 
-    lw x10, 4(x8)
+    lw x14, 4(x8)
     li x15, 0x00112023  # sw     x1, 0 (x2)
-    bne x10, x15, 1f
+    bne x14, x15, 2f
 
-      addi x8, x8, 8     # Do not inline these if they appear as the first opcodes in a definition
-  # -------------------------------------
+      addi x8, x8, 8  # Do not inline these if they appear in a definition
 
-1:
+2:# -------------------------------------
 
-  # -------------------------------------
-  lw x10, 0(x8)
+  lw x14, 0(x8)
   li x15, 0x00012083  # lw     x1, 0 (x2)
-  bne x10, x15, 2f
+  bne x14, x15, 2f
 
-    lw x10, 4(x8)
+    lw x14, 4(x8)
     li x15, 0x00410113  # addi   x2, x2, 4
-    bne x10, x15, 2f
+    bne x14, x15, 2f
 
-      lw x10, 8(x8)
+      lw x14, 8(x8)
       li x15, 0x00008067  # jalr   zero, 0 (x1) Ret-Opcode
-      beq x10, x15, 3f
-2:
-  # -------------------------------------
+      beq x14, x15, 3f
 
-  lw x10, 0(x8)
+2:# -------------------------------------
+
+  lw x14, 0(x8)
   li x15, 0x00008067 # Ret-Opcode
-  beq x10, x15, 3f
+  beq x14, x15, 3f
 
-    pushda x10
+    pushda x14
     call komma
     addi x8, x8, 4
     j 1b
 
 3:drop
-  pop_x1_x10
+  pop x1
   ret
 
   .endif
@@ -728,6 +683,7 @@ exitkomma:  # Writes a ret opcode into current definition. Take care with inlini
   .endif
 
 #------------------------------------------------------------------------------
+  Definition Flag_visible, "ret," # ( -- )
 retkomma: # Separat, weil MIPS einen Branch Delay Slot NOP braucht.
 #------------------------------------------------------------------------------
 
@@ -802,14 +758,15 @@ executemode:
   push x1
 
   laf x14, Datenstacksicherung # Setzt den Füllstand des Datenstacks zur Probe.
-  sw x9, 0(x14)               # Save current datastack pointer to detect structure mismatch later.
+  sw x9, 0(x14)                # Save current datastack pointer to detect structure mismatch later.
 
   call create
-  call push_x1_komma
+  # call push_x1_komma
 
   pop x1
-  j compilemode
-
+  # j compilemode
+  li x15, 1
+  j 1b
 
 push_x1_komma:
 
@@ -843,7 +800,7 @@ push_x1_komma:
   .endif
 
 # -----------------------------------------------------------------------------
-  Definition Flag_immediate_compileonly, ";" # ( -- )
+  Definition Flag_immediate_compileonly|Flag_noframe, ";" # ( -- )
 # -----------------------------------------------------------------------------
   push x1
 
@@ -853,9 +810,18 @@ push_x1_komma:
     writeln " Stack not balanced."
     j quit
 1: # Stack balanced, ok
-  call exitkomma
 
-4:call smudge
+  # Check if writing a push x1 / pop x1 frame is necessary.
+
+  laf x14, state
+  lw x14, 0(x14)
+  li x15, 1
+  bne x14, x15, 2f
+    call retkomma
+    j 3f
+2:  call exitkomma
+
+3:call smudge
   pop x1
   j executemode
 
@@ -873,69 +839,77 @@ execute:
 # -----------------------------------------------------------------------------
   Definition Flag_immediate, "immediate" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_immediate & ~Flag_visible
-  j setflags
+  li x15, Flag_immediate & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "inline" # ( -- )
 setze_inlineflag:
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_inline & ~Flag_visible
-  j setflags
+  li x15, Flag_inline & ~Flag_visible
+  j setflags_x15
+
+# -----------------------------------------------------------------------------
+  Definition Flag_immediate|Flag_foldable_0, "noframe" # ( -- )
+# -----------------------------------------------------------------------------
+  li x15, Flag_noframe & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate, "compileonly" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_immediate_compileonly & ~Flag_visible
-  j setflags
+  li x15, Flag_immediate_compileonly & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "0-foldable" # ( -- )
 setze_faltbarflag:
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_0 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_0 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "1-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_1 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_1 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "2-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_2 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_2 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "3-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_3 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_3 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "4-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_4 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_4 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "5-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_5 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_5 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "6-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_6 & ~Flag_visible
-  j setflags
+  li x15, Flag_foldable_6 & ~Flag_visible
+  j setflags_x15
 
 # -----------------------------------------------------------------------------
   Definition Flag_immediate|Flag_foldable_0, "7-foldable" # ( -- )
 # -----------------------------------------------------------------------------
-  pushdaconst Flag_foldable_7 & ~Flag_visible
+  li x15, Flag_foldable_7 & ~Flag_visible
+setflags_x15:
+  pushda x15
   j setflags
 
 # -----------------------------------------------------------------------------

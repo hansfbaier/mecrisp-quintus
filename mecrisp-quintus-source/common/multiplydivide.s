@@ -23,7 +23,7 @@
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "*" # ( x1 x2 -- x1*x2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe|Flag_opcodierbar, "*" # ( x1 x2 -- x1*x2 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -49,7 +49,7 @@ multiply_opcodierung:
   j komma
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "um*" # ( u1 u2 -- ud )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "um*" # ( u1 u2 -- ud )
 um_star:
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -59,7 +59,7 @@ um_star:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "m*" # ( n1 n2 -- d )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "m*" # ( n1 n2 -- d )
 m_star:
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -69,14 +69,14 @@ m_star:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "mulhsu" # ( n1 n2 -- n )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "mulhsu" # ( n1 n2 -- n )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   mulhsu x8, x15, x8
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "/" # ( n1 n2 -- n1/n2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe|Flag_opcodierbar, "/" # ( n1 n2 -- n1/n2 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -90,7 +90,7 @@ m_star:
   j multiply_opcodierung
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "mod" # ( n1 n2 -- n1%n2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe|Flag_opcodierbar, "mod" # ( n1 n2 -- n1%n2 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -104,7 +104,7 @@ m_star:
   j multiply_opcodierung
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "u/mod" # ( u1 u2 -- rem quot )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "u/mod" # ( u1 u2 -- rem quot )
 u_divmod:
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -114,7 +114,7 @@ u_divmod:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "/mod" # ( n1 n2 -- rem quot )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "/mod" # ( n1 n2 -- rem quot )
 divmod:
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)

@@ -132,6 +132,33 @@ fi
 
 # -----------------------------------------------------------------------------
 
+if [[ -z "$1" || "$1" = "ulx3s-pipeline-compressed" ]]
+then
+cd mecrisp-quintus-source/ulx3s-pipeline-compressed
+make clean all
+cp *.bin ../../ulx3s-pipeline-compressed
+make clean
+cd ../..
+
+cd ulx3s-pipeline-compressed/quintusemu-source
+fpc -XX -O3 quintusemu-ulx3s
+mv quintusemu-ulx3s ..
+rm -f *.o *.ppu
+cd ..
+
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt ../common/dump.txt welcome.txt > included-tools.txt
+cat ../common/conditional.txt                          ../common/disassembler-rv32imc.txt ../common/assembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/emulator-rv32imc.txt                        ../common/forget.txt ../common/flamingo.txt ../common/dump.txt welcome.txt > included-emulator.txt
+cat ../common/conditional.txt ../common/acrobatics.txt ../common/disassembler-rv32imc.txt                                ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt ../common/forget.txt ../common/flamingo.txt ../common/dump.txt welcome.txt > included-acrobatics.txt
+
+./buildcore ./quintusemu-ulx3s mecrisp-quintus-ulx3s.bin included-tools.txt      mecrisp-quintus-ulx3s-with-tools.bin
+./buildcore ./quintusemu-ulx3s mecrisp-quintus-ulx3s.bin included-emulator.txt   mecrisp-quintus-ulx3s-with-emulator.bin
+./buildcore ./quintusemu-ulx3s mecrisp-quintus-ulx3s.bin included-acrobatics.txt mecrisp-quintus-ulx3s-with-acrobatics.bin
+
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
 if [[ -z "$1" || "$1" = "lm4f120" ]]
 then
 cd mecrisp-quintus-source/mamihlapinatapai

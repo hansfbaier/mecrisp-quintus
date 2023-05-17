@@ -159,3 +159,14 @@ cd ../..
 fi
 
 # -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "ulx3s-pipeline-compressed" ]]
+then
+cd mecrisp-quintus-source/ulx3s-pipeline-compressed
+make clean all
+cp *.bin ../../ulx3s-pipeline-compressed
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------

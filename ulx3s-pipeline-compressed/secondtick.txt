@@ -1,0 +1,16 @@
+
+$40000080 constant leds-out
+
+$40040000 constant ticks
+$40080000 constant reload
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: tick ( -- ) 2 leds-out toggle ;
+
+' tick irq-collection !
+
+  -25000000 reload !     \ Reload value for timer which counts up and triggers interrupt on overflow.
+         -1 ticks  ! eint \ Trigger interrupt now by setting the cycle counter.

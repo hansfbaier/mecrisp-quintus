@@ -23,13 +23,13 @@
 #------------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "2dup" # ( 2 1 -- 2 1 2 1 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "2dup" # ( 2 1 -- 2 1 2 1 )
 # -----------------------------------------------------------------------------
   ddup
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "2drop" # ( 2 1 -- )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "2drop" # ( 2 1 -- )
 ddrop_vektor:
 # -----------------------------------------------------------------------------
   ddrop
@@ -50,7 +50,7 @@ dswap:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "2nip" # ( 4 3 2 1 -- 2 1 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "2nip" # ( 4 3 2 1 -- 2 1 )
 dnip:
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -876,7 +876,7 @@ Definition Flag_foldable_4, "d>"  # Just swapped the order of registers
   j d_less
 
 #------------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "d0<" # ( 1L 1H -- Flag ) Is double number negative ?
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "d0<" # ( 1L 1H -- Flag ) Is double number negative ?
 #------------------------------------------------------------------------------
   addi x9, x9, 4
   srai x8, x8, 31    # Turn MSB into 0xffffffff or 0x00000000

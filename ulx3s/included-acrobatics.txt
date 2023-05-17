@@ -911,7 +911,8 @@ maximum-inline-cache-length 8 * buffer: inline-cache
 \ -----------------------------------------------------------------------------
 
 : allocator: ( -- )
-  postpone exit
+
+  state @ 1 = if ret, true state ! else postpone exit then
 
   [ifdef] mips
     $2400FFFC  rsp-register >destination-i rsp-register >source1 opcode, \ addiu $2, $2, FFFC
@@ -923,7 +924,7 @@ maximum-inline-cache-length 8 * buffer: inline-cache
 
   flag-allocator setflags
 
-immediate ;
+immediate noframe ;
 
 : acro-only ( -- ) flag-acro-only setflags immediate 0-foldable ;
 

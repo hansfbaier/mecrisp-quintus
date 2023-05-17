@@ -326,3 +326,10 @@
     with single cycle instruction execution (except for div&rem)
 
   - Added firmware examples in assembler and C for the Icebreaker design
+
+27.11.2022, Matthias Koch, Mecrisp-Quintus 1.0.2
+
+  - Definitions can compile without a frame to push/pop link register now
+
+  - New target: ULX3S-Pipeline-Compressed, featuring FemtoRV32-Pegasus with
+    added support for compressed instructions and unaligned instruction fetch

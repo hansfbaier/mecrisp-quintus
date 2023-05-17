@@ -29,19 +29,19 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "eint"
+  Definition Flag_inline|Flag_noframe, "eint"
 # -----------------------------------------------------------------------------
   csrrsi zero, mstatus, 8 # Set Machine Interrupt Enable Bit
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "dint"
+  Definition Flag_inline|Flag_noframe, "dint"
 # -----------------------------------------------------------------------------
   csrrci zero, mstatus, 8 # Clear Machine Interrupt Enable Bit
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "wfi"
+  Definition Flag_inline|Flag_noframe, "wfi"
 # -----------------------------------------------------------------------------
   wfi
   ret

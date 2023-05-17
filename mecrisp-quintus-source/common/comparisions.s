@@ -20,14 +20,14 @@
 # Comparision operators
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "0=" # ( x -- ? )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "0=" # ( x -- ? )
 # -----------------------------------------------------------------------------
   sltiu x8, x8, 1
   sub x8, zero, x8
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "0<>" # ( x -- ? )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "0<>" # ( x -- ? )
 # -----------------------------------------------------------------------------
   sltiu x8, x8, 1
   addi x8, x8, -1
@@ -35,13 +35,13 @@
 
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "0<" # ( n -- ? )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "0<" # ( n -- ? )
 # -----------------------------------------------------------------------------
   srai x8, x8, 31
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, ">=" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, ">=" # ( x1 x2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -50,7 +50,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "<=" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "<=" # ( x1 x2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -59,7 +59,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "<" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "<" # ( x1 x2 -- ? )
                       # Checks if x2 is less than x1.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -69,7 +69,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, ">" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, ">" # ( x1 x2 -- ? )
                       # Checks if x2 is greater than x1.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -79,7 +79,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "u>=" # ( u1 u2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "u>=" # ( u1 u2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -88,7 +88,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "u<=" # ( u1 u2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "u<=" # ( u1 u2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -97,7 +97,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "u<" # ( u1 u2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "u<" # ( u1 u2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -106,7 +106,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "u>" # ( u1 u2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "u>" # ( u1 u2 -- ? )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -116,7 +116,7 @@
 
 # -----------------------------------------------------------------------------
   # Definition Flag_inline|Flag_opcodierbar_GleichUngleich, "<>" # ( x1 x2 -- ? )
-  Definition Flag_foldable_2|Flag_inline, "<>" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "<>" # ( x1 x2 -- ? )
                        # Compares the top two stack elements for inequality.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -128,7 +128,7 @@
 
 # -----------------------------------------------------------------------------
   # Definition Flag_inline|Flag_opcodierbar_GleichUngleich, "=" # ( x1 x2 -- ? )
-  Definition Flag_foldable_2|Flag_inline, "=" # ( x1 x2 -- ? )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "=" # ( x1 x2 -- ? )
                       # Compares the top two stack elements for equality.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -139,7 +139,7 @@
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "min" # ( x1 x2 -- x3 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "min" # ( x1 x2 -- x3 )
                         # x3 is the lesser of x1 and x2.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -149,7 +149,7 @@
 1:ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "max" # ( x1 x2 -- x3 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "max" # ( x1 x2 -- x3 )
                         # x3 is the greater of x1 and x2.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -159,7 +159,7 @@
 1:ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "umin" # ( u1 u2 -- u1|u2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "umin" # ( u1 u2 -- u1|u2 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -168,7 +168,7 @@
 1:ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "umax" # ( u1 u2 -- u1|u2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "umax" # ( u1 u2 -- u1|u2 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4

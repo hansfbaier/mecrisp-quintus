@@ -276,6 +276,22 @@ konstantenschleife:
     call konstantenschreiben
 
 # -----------------------------------------------------------------------------
+
+  # Check if writing a push x1 / pop x1 frame is necessary.
+
+  laf x14, state
+  lw x14, 0(x14)
+  li x15, 1
+  bne x14, x15, 2f
+
+  andi x14, x11, Flag_noframe & ~Flag_visible
+  bne x14, zero, 2f
+
+    call push_x1_komma
+    call compilemode
+2:
+
+# -----------------------------------------------------------------------------
   # Classic compilation.
   pushda x12 # Adresse zum klassischen Bearbeiten. Put code entry point on datastack.
 

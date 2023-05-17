@@ -106,7 +106,7 @@ move:  # ( Quelladdr Zieladdr Byteanzahl -- ) ( Source Destination Count -- )
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "@" # ( 32-addr -- x )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "@" # ( 32-addr -- x )
                               # Loads the cell at 'addr'.
 # -----------------------------------------------------------------------------
   lw x8, 0(x8)
@@ -213,7 +213,7 @@ opcodiere_fetch_adresskonstante:
 #   .endif
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "!" # ( x 32-addr -- )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "!" # ( x 32-addr -- )
 # Given a value 'x' and a cell-aligned address 'addr', stores 'x' to memory at 'addr', consuming both.
 # -----------------------------------------------------------------------------
 store:
@@ -357,7 +357,7 @@ opcodiere_store_adresskonstante_intern:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "h@" # ( 16-addr -- x )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "h@" # ( 16-addr -- x )
                               # Loads the half-word at 'addr'.
 # -----------------------------------------------------------------------------
   lhu x8, 0(x8)
@@ -374,7 +374,7 @@ opcodiere_store_adresskonstante_intern:
   j opcodiere_fetch_adresskonstante
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "h@signed" # ( 16-addr -- x )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "h@signed" # ( 16-addr -- x )
                               # Loads the half-word at 'addr'.
 # -----------------------------------------------------------------------------
   lh x8, 0(x8)
@@ -391,7 +391,7 @@ opcodiere_store_adresskonstante_intern:
   j opcodiere_fetch_adresskonstante
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "h!" # ( x 16-addr -- )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "h!" # ( x 16-addr -- )
 # Given a value 'x' and an 16-bit-aligned address 'addr', stores 'x' to memory at 'addr', consuming both.
 # -----------------------------------------------------------------------------
 hstore:
@@ -428,7 +428,7 @@ hstore:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "c@" # ( 8-addr -- x )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "c@" # ( 8-addr -- x )
                               # Loads the byte at 'addr'.
 # -----------------------------------------------------------------------------
   lbu x8, 0(x8)
@@ -445,7 +445,7 @@ hstore:
   j opcodiere_fetch_adresskonstante
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "c@signed" # ( 8-addr -- x )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "c@signed" # ( 8-addr -- x )
                               # Loads the byte at 'addr'.
 # -----------------------------------------------------------------------------
   lb x8, 0(x8)
@@ -462,7 +462,7 @@ hstore:
   j opcodiere_fetch_adresskonstante
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline|Flag_opcodierbar, "c!" # ( x 8-addr -- )
+  Definition Flag_inline|Flag_noframe|Flag_opcodierbar, "c!" # ( x 8-addr -- )
 # Given a value 'x' and an 8-bit-aligned address 'addr', stores 'x' to memory at 'addr', consuming both.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)

@@ -22,14 +22,14 @@
 # Stack pointers
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "sp@" # ( -- a-addr )
+  Definition Flag_inline|Flag_noframe, "sp@" # ( -- a-addr )
 # -----------------------------------------------------------------------------
   pushdatos
   mv x8, x9
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "sp!" # ( a-addr -- )
+  Definition Flag_inline|Flag_noframe, "sp!" # ( a-addr -- )
 # -----------------------------------------------------------------------------
   mv x9, x8
   drop
@@ -52,40 +52,40 @@
 # Stack juggling
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "dup" # ( x -- x x )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "dup" # ( x -- x x )
 dup_einsprung:
 # -----------------------------------------------------------------------------
   dup
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "drop" # ( x -- )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "drop" # ( x -- )
 drop_einsprung:
 # -----------------------------------------------------------------------------
   drop
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "?dup" # ( x -- 0 | x x )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "?dup" # ( x -- 0 | x x )
 # -----------------------------------------------------------------------------
   beq x8, zero, 1f
     pushdatos
 1:ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "swap" # ( x y -- y x )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "swap" # ( x y -- y x )
 # -----------------------------------------------------------------------------
   swap
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "nip" # ( x y -- x )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "nip" # ( x y -- x )
 # -----------------------------------------------------------------------------
   nip
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "over" # ( x y -- x y x )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "over" # ( x y -- x y x )
 # -----------------------------------------------------------------------------
 over_einsprung:
   pushdatos
@@ -93,7 +93,7 @@ over_einsprung:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline, "tuck" # ( x1 x2 -- x2 x1 x2 )
+  Definition Flag_foldable_2|Flag_inline|Flag_noframe, "tuck" # ( x1 x2 -- x2 x1 x2 )
 # -----------------------------------------------------------------------------
 tuck:
   lw x15, 0(x9)
@@ -125,7 +125,7 @@ minusrot:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_inline, "pick" # ( xu .. x1 x0 u -- xu ... x1 x0 xu )
+  Definition Flag_inline|Flag_noframe, "pick" # ( xu .. x1 x0 u -- xu ... x1 x0 xu )
 # -----------------------------------------------------------------------------
 pick:
   sll x8, x8, 2

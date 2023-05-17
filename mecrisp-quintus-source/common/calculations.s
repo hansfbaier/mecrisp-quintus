@@ -20,7 +20,7 @@
 # Small calculations
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "+" # ( x1 x2 -- x1+x2 )
+  Definition Flag_foldable_2|Flag_opcodierbar|Flag_inline|Flag_noframe, "+" # ( x1 x2 -- x1+x2 )
                       # Adds x1 and x2.
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
@@ -87,7 +87,7 @@ opcodiereinsprung_lang: # Lange Variante mit zwei Opcodes.
   j komma
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "-" # ( x1 x2 -- x1-x2 )
+  Definition Flag_foldable_2|Flag_opcodierbar|Flag_inline|Flag_noframe, "-" # ( x1 x2 -- x1-x2 )
                       # Subtracts x2 from x1.
 # -----------------------------------------------------------------------------
 minus:
@@ -105,7 +105,7 @@ minus:
 
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "slt" # ( x1 x2 -- 0 | 1 )
+  Definition Flag_foldable_2|Flag_opcodierbar|Flag_inline|Flag_noframe, "slt" # ( x1 x2 -- 0 | 1 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -130,7 +130,7 @@ minus:
   j opcodiereinsprung_signed
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_2|Flag_inline|Flag_opcodierbar, "sltu" # ( x1 x2 -- 0 | 1 )
+  Definition Flag_foldable_2|Flag_opcodierbar|Flag_inline|Flag_noframe, "sltu" # ( x1 x2 -- 0 | 1 )
 # -----------------------------------------------------------------------------
   lw x15, 0(x9)
   addi x9, x9, 4
@@ -155,77 +155,77 @@ minus:
   j opcodiereinsprung_signed
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "1-" # ( u -- u-1 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "1-" # ( u -- u-1 )
                       # Subtracts one from the cell on top of the stack.
 # -----------------------------------------------------------------------------
   addi x8, x8, -1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "1+" # ( u -- u+1 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "1+" # ( u -- u+1 )
                        # Adds one to the cell on top of the stack.
 # -----------------------------------------------------------------------------
   addi x8, x8, 1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "2-" # ( u -- u-1 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "2-" # ( u -- u-1 )
                       # Subtracts two from the cell on top of the stack.
 # -----------------------------------------------------------------------------
   addi x8, x8, -2
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "2+" # ( u -- u+1 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "2+" # ( u -- u+1 )
                        # Adds two to the cell on top of the stack.
 # -----------------------------------------------------------------------------
   addi x8, x8, 2
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "cell+" # ( x -- x+4 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "cell+" # ( x -- x+4 )
 # -----------------------------------------------------------------------------
   addi x8, x8, 4
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "negate" # ( n1 -- -n1 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "negate" # ( n1 -- -n1 )
 # -----------------------------------------------------------------------------
   sub x8, zero, x8
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "shr" # ( x -- x' ) # Um eine Stelle rechts schieben
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "shr" # ( x -- x' ) # Um eine Stelle rechts schieben
 # -----------------------------------------------------------------------------
   srli x8, x8, 1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "shl" # ( x -- x' ) # Um eine Stelle links schieben
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "shl" # ( x -- x' ) # Um eine Stelle links schieben
 # -----------------------------------------------------------------------------
   slli x8, x8, 1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "2*" # ( n -- n*2 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "2*" # ( n -- n*2 )
 # -----------------------------------------------------------------------------
   add x8, x8, x8
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "cells" # ( x -- 4*x )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "cells" # ( x -- 4*x )
 # -----------------------------------------------------------------------------
   slli x8, x8, 2
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "2/" # ( n -- n/2 )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "2/" # ( n -- n/2 )
 # -----------------------------------------------------------------------------
   srai x8, x8, 1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "abs" # ( n1 -- |n1| )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "abs" # ( n1 -- |n1| )
 # -----------------------------------------------------------------------------
   srai x15, x8, 31 # Turn MSB into 0xffffffff or 0x00000000
   add x8, x8, x15
@@ -233,7 +233,7 @@ minus:
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_foldable_1|Flag_inline, "even" # ( x -- x' )
+  Definition Flag_foldable_1|Flag_inline|Flag_noframe, "even" # ( x -- x' )
 # -----------------------------------------------------------------------------
   andi x15, x8, 1
   add x8, x8, x15

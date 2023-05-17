@@ -21,6 +21,8 @@
 # -----------------------------------------------------------------------------
 
 .option norelax
+.option rvc
+.equ compressed_isa, 1
 
 # -----------------------------------------------------------------------------
 # Speicherkarte für Flash und RAM
@@ -30,27 +32,26 @@
 # Konstanten für die Größe des Ram-Speichers
 
 .equ RamAnfang, 0x00000000 # Start of RAM          Porting: Change this !
-.equ RamEnde,   0x00003000 # End   of RAM.  12 kb. Porting: Change this !
+.equ RamEnde,   0x00010000 # End   of RAM.  64 kb. Porting: Change this !
 
 # Konstanten für die Größe und Aufteilung des Flash-Speichers
 
-.equ FlashAnfang, 0x00003000 # Start of Flash          Porting: Change this !
-.equ FlashEnde,   0x00023000 # End   of Flash. 128 kb. Porting: Change this !
+.equ FlashAnfang, 0x00010000 # Start of Flash          Porting: Change this !
+.equ FlashEnde,   0x00020000 # End   of Flash.  64 kb. Porting: Change this !
 
-.equ FlashDictionaryAnfang, FlashAnfang + 0x6000 #  24 kb reserved for core.
-.equ FlashDictionaryEnde,   FlashEnde            # 104 kb space for "user flash dictionary"
+.equ FlashDictionaryAnfang, FlashAnfang + 0x4400 # 17 kb reserved for core.
+.equ FlashDictionaryEnde,   FlashEnde            # 47 kb space for "user flash dictionary"
 
 # -----------------------------------------------------------------------------
 # Core start
 # -----------------------------------------------------------------------------
 
 .text
-  j irq_collection
 
-  # Take care: We are executing at 0x00100000 currently.
-  # Copy Forth core from SPI Flash to RAM, mirroring the core to 0x3000:
+  # Take care: We are executing at 0x00820000 currently.
+  # Copy Forth core from SPI Flash to RAM, mirroring the core to 0x10000:
 
-  li x5, 0x00100000
+  auipc x5, 0
   li x6, FlashAnfang
   li x7, FlashEnde-FlashAnfang
 
@@ -77,11 +78,14 @@
 # -----------------------------------------------------------------------------
 Reset: # Forth begins here
 # -----------------------------------------------------------------------------
+
   .include "../common/catchflashpointers.s"
 
   call uart_init
 
-  welcome " for RISC-V 32 IM on Icebreaker by Matthias Koch"
+  welcome " for RISC-V RV32IMC on Icebreaker by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"
+
+.org 0x10000, 0xFF

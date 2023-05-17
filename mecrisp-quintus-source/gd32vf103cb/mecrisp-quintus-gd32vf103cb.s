@@ -204,7 +204,7 @@ Reset: # Forth begins here
   # Catch the pointers for Flash dictionary
   .include "../common/catchflashpointers.s"
 
-  welcome " for RISC-V 32 IMC on GD32VF103CB by Matthias Koch"
+  welcome " for RISC-V RV32IMC on GD32VF103CB by Matthias Koch"
 
   # Memory access errors will go pending, but do not trigger unless interrupts are enabled globally.
   csrrsi zero, mstatus, 8    # MSTATUS: Set Machine Interrupt Enable Bit

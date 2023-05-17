@@ -27,7 +27,7 @@
 #  A few constant definitions
 # -----------------------------------------------------------------------------
 
-.equ leds, 0x20000080
+.equ leds, 0x400080
 
 # -----------------------------------------------------------------------------
 #  Flash start
@@ -38,10 +38,10 @@
   .balign 4, 0
 Boot:    # Normal entry point
 
-  # Take care: We are executing at 0x00100000 currently.
+  # Take care: We are executing at 0x00840000 currently.
   # Copy code from SPI Flash to RAM for execution, mirroring at 0
 
-  li x8, 0x00100000
+  li x8, 0x00840000
   li x9, 0x00000000
   li x10, 0x100
 

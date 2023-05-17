@@ -1,23 +1,21 @@
 
 /******************************************************************************/
-//  ULX3S
+// A lot of RISC-V on the ULX3S
 /******************************************************************************/
 
 `default_nettype none // Makes it easier to detect typos !
 
-`define cfg_divider 347  // 40 MHz / 115200
-
-`include "femtorv32_gracilis.v"
-`include "uart-fifo.v"
-`include "MappedSPIFlash.v"
-`include "ringoscillator-ecp5.v"
-`include "muchtoremember.v"
+`include "../../common-verilog/femtorv32_gracilis.v"
+`include "../../common-verilog/uart-fifo.v"
+`include "../../common-verilog/MappedSPIFlash.v"
+`include "../../common-verilog/ringoscillator-ecp5.v"
+`include "../../common-verilog/sdram/muchtoremember.v"
 
 module ulx3s(
 
   input clk_25mhz,
   input [6:0] btn,
-  output [7:0] led,
+   output [7:0] led,
 
   output wifi_gpio0,
   output wifi_en,
@@ -86,13 +84,13 @@ module ulx3s(
    // Reset logic.
    /***************************************************************************/
 
-    reg [7:0] reset_cnt = 0;
-    wire resetq = &reset_cnt;
+   reg [7:0] reset_cnt = 0;
+   wire resetq = &reset_cnt;
 
-    always @(posedge clk) begin
-      if (btn[0]) reset_cnt <= reset_cnt + !resetq;
-      else        reset_cnt <= 0;
-    end
+   always @(posedge clk) begin
+     if (btn[0]) reset_cnt <= reset_cnt + !resetq;
+     else        reset_cnt <= 0;
+   end
 
    /***************************************************************************/
    // LEDs.
@@ -102,7 +100,7 @@ module ulx3s(
    assign led = LEDs;
 
    /***************************************************************************/
-   // Ring oscillator.
+   // Ring oscillator for random numbers.
    /***************************************************************************/
 
    wire random;
@@ -152,7 +150,10 @@ module ulx3s(
    wire serial_wr = io_wstrb & mem_address[IO_UART_DAT_bit];
    wire serial_rd = io_rstrb & mem_address[IO_UART_DAT_bit];
 
-   buart _buart (
+   buart #(
+     .FREQ_MHZ(40),
+     .BAUDS(115200)
+   ) buart (
       .clk(clk),
       .resetq(resetq),
       .rx(ftdi_txd),
@@ -302,7 +303,7 @@ module ulx3s(
      if (io_wstrb & mem_address[IO_OLED_DIR_bit  ]) oled_dir   <= io_modifier;
      if (io_wstrb & mem_address[IO_SD_OUT_bit    ]) sd_out     <= io_modifier;
      if (io_wstrb & mem_address[IO_ANALOG_OUT_bit]) analog_out <= io_modifier;
-     if (io_wstrb & mem_address[IO_LEDS_bit      ]) LEDs       <= io_modifier;
+     if (io_wstrb & mem_address[IO_LEDS_bit    ]) LEDs     <= io_modifier;
 
    end
 
@@ -369,7 +370,7 @@ module ulx3s(
    wire io_wstrb = mem_wstrb & mem_address_is_io;
 
    /***************************************************************************/
-   // 64 MB SD-RAM
+   // 64 MB SD-RAM.
    /***************************************************************************/
 
    wire [31:0] sdram_rdata;
@@ -427,11 +428,14 @@ module ulx3s(
       .IO({flash_miso, flash_mosi})
    );
 
+   assign  mem_rbusy = sdram_busy | mapped_spi_flash_rbusy;
+   assign  mem_wbusy = sdram_busy;
+
    /***************************************************************************/
    // RAM.
    /***************************************************************************/
 
-   reg  [31:0] RAM[(2*65536/4)-1:0]; // 128 kb BRAM
+   reg  [31:0] RAM[(128*1024/4)-1:0];
    reg  [31:0] ram_rdata;
 
    always @(posedge clk) begin
@@ -454,9 +458,6 @@ module ulx3s(
       (mem_address_is_io        ? io_rdata_buffered      : 32'd0) |
       (mem_address_is_spi_flash ? mapped_spi_flash_rdata : 32'd0) |
       (mem_address_is_sdram     ? sdram_rdata            : 32'd0) ;
-
-   assign  mem_rbusy = sdram_busy | mapped_spi_flash_rbusy;
-   assign  mem_wbusy = sdram_busy;
 
 endmodule
 

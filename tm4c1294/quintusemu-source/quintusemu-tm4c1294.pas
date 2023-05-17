@@ -54,13 +54,13 @@ var character : byte;
 begin
   character := ord(readkey) and $FF;
   if character = 27 then halt;
-  // writeln('Key', inttostr(character));  
+  // writeln('Key', inttostr(character));
   key := character;
 end;
 
 var memory_flash : array[$00000000..$00100000] of byte;
     memory_ram   : array[$20000000..$20040000] of byte;
-    
+
 function flash(addr : dword) : boolean;
 begin
   flash := addr < $00100000;
@@ -70,36 +70,36 @@ function ram(addr : dword) : boolean;
 begin
   ram := ($20000000 <= addr) and (addr < $20040000);
 end;
-    
+
 function read8 (addr : dword) : dword;
 begin
   read8 := $FF;
   if flash(addr) then read8 := memory_flash[addr];
   if   ram(addr) then read8 :=   memory_ram[addr];
 end;
-                                                       
+
 function read16(addr : dword) : dword;
 begin
   read16 := $FFFF;
   if flash(addr) then read16 := memory_flash[addr] or
                                 memory_flash[addr + 1] shl 8;
   if   ram(addr) then read16 :=   memory_ram[addr] or
-                                  memory_ram[addr + 1] shl 8;                 
-end;                                                       
-    
+                                  memory_ram[addr + 1] shl 8;
+end;
+
 function read32(addr : dword) : dword;
 begin
   // writeln('Read32 ', dword2hex(addr));
-  case addr of    
-  
+  case addr of
+
     $400FD008: read32 := 0;   // FLASH_FMC never busy
     $4000C018: read32 := 0;   // UARTFR never busy
-    $4000C000: read32 := key; // USART1_TDR        
-    
-  else     
-  
+    $4000C000: read32 := key; // USART1_TDR
+
+  else
+
     read32 := $FFFFFFFF;
-      
+
     if flash(addr) then read32 := memory_flash[addr] or
                                   memory_flash[addr + 1] shl  8  or
                                   memory_flash[addr + 2] shl 16  or
@@ -121,54 +121,54 @@ end;
 procedure store16(addr, data : dword);
 begin
   if flash(addr) then begin
-                        memory_flash[addr  ] :=  data         and $FF; 
+                        memory_flash[addr  ] :=  data         and $FF;
                         memory_flash[addr+1] := (data shr  8) and $FF;
                       end;
   if   ram(addr) then begin
-                          memory_ram[addr  ] :=  data         and $FF; 
+                          memory_ram[addr  ] :=  data         and $FF;
                           memory_ram[addr+1] := (data shr  8) and $FF;
-                      end;                      
+                      end;
 end;
 
 var flash_address : dword = $FFFFFFFF;
     flash_data    : dword = $FFFFFFFF;
-                                             
+
 procedure store32(addr, data : dword);
 var coredump : longint;
 begin
   // writeln('Store32 ', dword2hex(addr), ' ', dword2hex(data));
   case addr of
-  
+
       $4000C000: emit(data and $FF);    // USART1_TDR
       $400FD000: flash_address := data; // FLASH_FMA
       $400FD004: flash_data    := data; // FLASH_FMD
       $400FD008: if data = $A4420001 then store32(flash_address, flash_data); // FLASH_FMC
-  
-    $DABBAD00: begin // Special helper to generate binaries with precompiled sources.    
-                 filecreate('coredump.bin');    
+
+    $DABBAD00: begin // Special helper to generate binaries with precompiled sources.
+                 filecreate('coredump.bin');
                  coredump := fileopen('coredump.bin', fmOpenWrite);
-                 filewrite(coredump, memory_flash[0], data);  
+                 filewrite(coredump, memory_flash[0], data);
                  fileclose(coredump);
                  halt;
-               end;      
-    
+               end;
+
   else
     if flash(addr) then begin
                           memory_flash[addr  ] :=  data         and $FF;
                           memory_flash[addr+1] := (data shr  8) and $FF;
                           memory_flash[addr+2] := (data shr 16) and $FF;
                           memory_flash[addr+3] := (data shr 24) and $FF;
-                        end;  
+                        end;
     if   ram(addr) then begin
                             memory_ram[addr  ] :=  data         and $FF;
                             memory_ram[addr+1] := (data shr  8) and $FF;
                             memory_ram[addr+2] := (data shr 16) and $FF;
                             memory_ram[addr+3] := (data shr 24) and $FF;
-                        end;                        
+                        end;
   end;
 end;
 
-// ----------------------------------------------------------------------------                                             
+// ----------------------------------------------------------------------------
 //  Small utilities
 
 function sar (data, amount : dword) : dword;
@@ -189,7 +189,7 @@ end;
 
 function signedless(data1, data2 : longint) : boolean;
 begin
-  signedless := data1 < data2;  
+  signedless := data1 < data2;
 end;
 
 // ----------------------------------------------------------------------------
@@ -212,7 +212,7 @@ end;
 
 function imm_s(inst : dword) : dword;
 begin
-  imm_s  := sar(inst and $FE000000, 20) or rd(inst);  
+  imm_s  := sar(inst and $FE000000, 20) or rd(inst);
 end;
 
 function imm_sb(inst : dword) : dword;
@@ -223,9 +223,9 @@ begin
          ((inst shr (25- 5)) and $7e0)       or
          ((inst shr ( 8- 1)) and $1e)        or
          ((inst shl (11- 7)) and (1 shl 11));
-         
+
   imm_sb := sar((imm shl 19), 19);
-          
+
 // imm = ((insn >> (31 - 12)) & (1 << 12)) |
 //     ((insn >> (25 - 5)) & 0x7e0) |
 //     ((insn >> (8 - 1)) & 0x1e) |
@@ -242,18 +242,18 @@ end;
 function imm_uj(inst : dword) : dword;
 var imm : dword;
 begin
-                  
+
   imm := ((inst shr (31-20)) and (1 shl 20)) or
          ((inst shr (21- 1)) and $7fe)       or
          ((inst shr (20-11)) and (1 shl 11)) or
           (inst and $ff000);
   imm_uj := sar((imm shl 11), 11);
-  
+
 // imm = ((insn >> (31 - 20)) & (1 << 20)) |
 //     ((insn >> (21 - 1)) & 0x7fe) |
 //     ((insn >> (20 - 11)) & (1 << 11)) |
 //     (insn & 0xff000);
-// imm = (imm << 11) >> 11;  
+// imm = (imm << 11) >> 11;
 
 end;
 
@@ -276,7 +276,7 @@ function disassemble_immediate(addr, inst : dword) : string;
 var s : string;
     immediate : dword;
 begin
-  
+
   immediate := imm_i(inst);
   case funct3(inst) of
     0 : s := 'addi   ';
@@ -287,10 +287,10 @@ begin
     5 : begin if (inst shr 26) = 16 then s := 'srai   ' else s := 'srli   '; immediate := immediate and $1F; end;
     6 : s := 'ori    ';
     7 : s := 'andi   ';
-  else 
+  else
     s := '?';
   end;
-  
+
   disassemble_immediate := s + printregister(rd(inst)) + ', ' + printregister(rs1(inst)) + ', ' + dword2hex(immediate);
 end;
 
@@ -313,10 +313,10 @@ begin
     2 : s := 'lw     ';
     4 : s := 'lbu    ';
     5 : s := 'lhu    ';
-  else 
+  else
     s := '?';
   end;
-  
+
   disassemble_load := s + printregister(rd(inst)) + ', ' + dword2hex(immediate) + ' (' + printregister(rs1(inst)) + ')';
 end;
 
@@ -337,14 +337,14 @@ begin
     5 : s := 'divu   ';
     6 : s := 'rem    ';
     7 : s := 'remu   ';
-  else 
+  else
     s := '?';
   end;
 
 end
 else
 begin
-  
+
   case funct3(inst) of
     0 : if funct7(inst) = 32 then s := 'sub    ' else s := 'add    ';
     1 : s := 'sll    ';
@@ -354,12 +354,12 @@ begin
     5 : if funct7(inst) = 32 then s := 'sra    ' else s := 'srl    ';
     6 : s := 'or     ';
     7 : s := 'and    ';
-  else 
+  else
     s := '?';
   end;
-  
-end;  
-  
+
+end;
+
   disassemble_register := s + printregister(rd(inst)) + ', ' + printregister(rs1(inst)) + ', ' + printregister(rs2(inst));
 end;
 
@@ -379,35 +379,35 @@ begin
 end;
 
 function disassemble_store(addr, inst : dword) : string;
-var s : string;  
+var s : string;
 begin
 
-  case funct3(inst) of  
+  case funct3(inst) of
     0 : s := 'sb     ';
     1 : s := 'sh     ';
     2 : s := 'sw     ';
-  else 
+  else
     s := '?';
   end;
-  
+
   disassemble_store := s + printregister(rs2(inst)) + ', ' + dword2hex(imm_s(inst)) + ' (' + printregister(rs1(inst)) + ')';
 end;
 
 function disassemble_branch(addr, inst : dword) : string;
-var s : string;  
+var s : string;
 begin
 
-  case funct3(inst) of  
+  case funct3(inst) of
     0 : s := 'beq    ';
     1 : s := 'bne    ';
     4 : s := 'blt    ';
     5 : s := 'bge    ';
     6 : s := 'bltu   ';
     7 : s := 'bgeu   ';
-  else 
+  else
     s := '?';
   end;
-  
+
   disassemble_branch := s + printregister(rs1(inst)) + ', ' + printregister(rs2(inst)) + ', ' + dword2hex(addr + imm_sb(inst));
 end;
 
@@ -415,22 +415,23 @@ end;
 
 function disassemble(addr, inst : dword) : string;
 begin
+  disassemble := '';
   // 32 bit opcodes always have %11 set.
   case opcode(inst) of
     $03: disassemble := disassemble_load      (addr, inst);
     $13: disassemble := disassemble_immediate (addr, inst);
-    $17: disassemble := disassemble_auipc     (addr, inst);    
+    $17: disassemble := disassemble_auipc     (addr, inst);
     $23: disassemble := disassemble_store     (addr, inst);
     $33: disassemble := disassemble_register  (addr, inst);
     $37: disassemble := disassemble_lui       (addr, inst);
     $63: disassemble := disassemble_branch    (addr, inst);
     $67: disassemble := disassemble_jalr      (addr, inst);
-    $6F: disassemble := disassemble_jal       (addr, inst);      
+    $6F: disassemble := disassemble_jal       (addr, inst);
   else
     //disassemble := 'Unknown opcode ' + dword2hex(opcode(inst));
       disassemble := '';
   end;
-  
+
 end;
 
 // ----------------------------------------------------------------------------
@@ -449,18 +450,18 @@ procedure set_pc(destination : dword); begin pc := destination; end;
 //  Emulator
 
 procedure execute_immediate(inst : dword);
-begin  
+begin
   case funct3(inst) of
-    0 : write_register(rd(inst), read_register(rs1(inst))  +  imm_i(inst) ); // addi 
+    0 : write_register(rd(inst), read_register(rs1(inst))  +  imm_i(inst) ); // addi
     1 : write_register(rd(inst), read_register(rs1(inst)) shl (imm_i(inst) and $1F) ); // slli
-    2 : if signedless(read_register(rs1(inst)),  imm_i(inst)) then write_register(rd(inst), 1) else write_register(rd(inst), 0); // slti 
+    2 : if signedless(read_register(rs1(inst)),  imm_i(inst)) then write_register(rd(inst), 1) else write_register(rd(inst), 0); // slti
     3 : if            read_register(rs1(inst)) < imm_i(inst)  then write_register(rd(inst), 1) else write_register(rd(inst), 0); // sltiu
-    4 : write_register(rd(inst), read_register(rs1(inst)) xor imm_i(inst) ); // xori 
-    5 : if  (inst shr 26) = 16   
+    4 : write_register(rd(inst), read_register(rs1(inst)) xor imm_i(inst) ); // xori
+    5 : if  (inst shr 26) = 16
    then write_register(rd(inst), sar(read_register(rs1(inst)),    (imm_i(inst) and $1F) ) )  // srai
-   else write_register(rd(inst),     read_register(rs1(inst)) shr (imm_i(inst) and $1F)   ); // srli   
-    6 : write_register(rd(inst), read_register(rs1(inst))  or imm_i(inst) ); // ori  
-    7 : write_register(rd(inst), read_register(rs1(inst)) and imm_i(inst) ); // andi 
+   else write_register(rd(inst),     read_register(rs1(inst)) shr (imm_i(inst) and $1F)   ); // srli
+    6 : write_register(rd(inst), read_register(rs1(inst))  or imm_i(inst) ); // ori
+    7 : write_register(rd(inst), read_register(rs1(inst)) and imm_i(inst) ); // andi
   end;
   set_pc(get_pc + 4);
 end;
@@ -478,9 +479,9 @@ end;
 procedure execute_load(inst : dword);
 begin
   case funct3(inst) of
-    0 : write_register(rd(inst), sign8 (read8 (read_register(rs1(inst)) + imm_i(inst)))); // lb 
-    1 : write_register(rd(inst), sign16(read16(read_register(rs1(inst)) + imm_i(inst)))); // lh 
-    2 : write_register(rd(inst),        read32(read_register(rs1(inst)) + imm_i(inst)) ); // lw 
+    0 : write_register(rd(inst), sign8 (read8 (read_register(rs1(inst)) + imm_i(inst)))); // lb
+    1 : write_register(rd(inst), sign16(read16(read_register(rs1(inst)) + imm_i(inst)))); // lh
+    2 : write_register(rd(inst),        read32(read_register(rs1(inst)) + imm_i(inst)) ); // lw
     4 : write_register(rd(inst),        read8 (read_register(rs1(inst)) + imm_i(inst)) ); // lbu
     5 : write_register(rd(inst),        read16(read_register(rs1(inst)) + imm_i(inst)) ); // lhu
   end;
@@ -497,10 +498,10 @@ end;
 procedure execute_register(inst : dword);
 var ud1, ud2, ud : uint64;
     d1, d2, d : int64;
-    
+
     signed1, signed2, signed : int32;
     unsigned1, unsigned2, unsigned : uint32;
-    
+
 begin
 
 if funct7(inst) = 1 then  // RV32M
@@ -508,69 +509,69 @@ begin
 
   case funct3(inst) of
     0 : write_register(rd(inst), read_register(rs1(inst)) * read_register(rs2(inst)) ); // mul
-    1 : begin // mulh    high part    
+    1 : begin // mulh    high part
           d1 := sign64(read_register(rs1(inst)));
           d2 := sign64(read_register(rs2(inst)));
           d := d1 * d2;
           write_register(rd(inst), d shr 32 );
-        end;                    
+        end;
     2 : begin // mulhsu
           ud1 := read_register(rs1(inst));
           d2 := sign64(read_register(rs2(inst)));
           d := ud1 * d2;
           write_register(rd(inst), d shr 32 );
-        end;  
+        end;
     3 : begin // mulhu
           ud1 := read_register(rs1(inst));
           ud2 := read_register(rs2(inst));
           ud := ud1 * ud2;
           write_register(rd(inst), ud shr 32 );
-        end;                
+        end;
     4 : begin // div
           signed1 := read_register(rs1(inst));
           signed2 := read_register(rs2(inst));
           signed := signed1 div signed2;
           write_register(rd(inst), signed);
         end;
-    5 : begin // divu  
+    5 : begin // divu
           unsigned1 := read_register(rs1(inst));
           unsigned2 := read_register(rs2(inst));
           unsigned := unsigned1 div unsigned2;
           write_register(rd(inst), unsigned);
         end;
-    6 : begin // rem   
+    6 : begin // rem
           signed1 := read_register(rs1(inst));
           signed2 := read_register(rs2(inst));
           signed := signed1 mod signed2;
           write_register(rd(inst), signed);
         end;
-    7 : begin // remu  
+    7 : begin // remu
           unsigned1 := read_register(rs1(inst));
           unsigned2 := read_register(rs2(inst));
           unsigned := unsigned1 mod unsigned2;
           write_register(rd(inst), unsigned);
         end;
   end;
-  
+
 end
 else
 begin
-  
+
   case funct3(inst) of
     0 : if funct7(inst) = 32
    then write_register(rd(inst), read_register(rs1(inst))  -   read_register(rs2(inst)) )  // sub
    else write_register(rd(inst), read_register(rs1(inst))  +   read_register(rs2(inst)) ); // add
-    1 : write_register(rd(inst), read_register(rs1(inst)) shl  read_register(rs2(inst)) );  // sll           
+    1 : write_register(rd(inst), read_register(rs1(inst)) shl  read_register(rs2(inst)) );  // sll
     2:  if signedless(read_register(rs1(inst)),  read_register(rs2(inst)) ) then write_register(rd(inst), 1) else write_register(rd(inst), 0); // slt
-    3 : if            read_register(rs1(inst)) < read_register(rs2(inst))   then write_register(rd(inst), 1) else write_register(rd(inst), 0); // sltu        
-    4 : write_register(rd(inst), read_register(rs1(inst)) xor read_register(rs2(inst)) );  // xor   
+    3 : if            read_register(rs1(inst)) < read_register(rs2(inst))   then write_register(rd(inst), 1) else write_register(rd(inst), 0); // sltu
+    4 : write_register(rd(inst), read_register(rs1(inst)) xor read_register(rs2(inst)) );  // xor
     5 : if funct7(inst) = 32
    then write_register(rd(inst), sar( read_register(rs1(inst)),     read_register(rs2(inst)) ) )  // sra
    else write_register(rd(inst),      read_register(rs1(inst)) shr  read_register(rs2(inst))   ); // srl
-    6 : write_register(rd(inst), read_register(rs1(inst)) or  read_register(rs2(inst)) );  // or    
+    6 : write_register(rd(inst), read_register(rs1(inst)) or  read_register(rs2(inst)) );  // or
     7 : write_register(rd(inst), read_register(rs1(inst)) and read_register(rs2(inst)) );  // and
   end;
- 
+
 end;
 
   set_pc(get_pc + 4);
@@ -579,12 +580,12 @@ end; // execute_register
 procedure execute_jal(inst : dword);
 begin
   write_register(rd(inst), get_pc + 4);
-  set_pc(get_pc + imm_uj(inst));            
+  set_pc(get_pc + imm_uj(inst));
 end;
 
 procedure execute_lui(inst : dword);
 begin
-  write_register(rd(inst), imm_u(inst));  
+  write_register(rd(inst), imm_u(inst));
   set_pc(get_pc + 4);
 end;
 
@@ -596,7 +597,7 @@ end;
 
 procedure execute_store(inst : dword);
 begin
-  case funct3(inst) of  
+  case funct3(inst) of
     0 : store8 (read_register(rs1(inst)) + imm_s(inst), read_register(rs2(inst)) ); // sb
     1 : store16(read_register(rs1(inst)) + imm_s(inst), read_register(rs2(inst)) ); // sh
     2 : store32(read_register(rs1(inst)) + imm_s(inst), read_register(rs2(inst)) ); // sw
@@ -606,11 +607,11 @@ end;
 
 procedure execute_branch(inst : dword);
 begin
-  case funct3(inst) of  
+  case funct3(inst) of
     0 : if                 read_register(rs1(inst)) = read_register(rs2(inst))   then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // beq
-    1 : if not           ( read_register(rs1(inst)) = read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bne 
-    4 : if     signedless( read_register(rs1(inst)),  read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // blt 
-    5 : if not signedless( read_register(rs1(inst)),  read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bge 
+    1 : if not           ( read_register(rs1(inst)) = read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bne
+    4 : if     signedless( read_register(rs1(inst)),  read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // blt
+    5 : if not signedless( read_register(rs1(inst)),  read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bge
     6 : if                 read_register(rs1(inst)) < read_register(rs2(inst))   then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bltu
     7 : if not           ( read_register(rs1(inst)) < read_register(rs2(inst)) ) then set_pc(get_pc + imm_sb(inst)) else set_pc(get_pc + 4); // bgeu
   end;
@@ -622,21 +623,21 @@ begin
   inst := read32(get_pc);
 
   if inst = 42 then begin writeln(disassemble(read_register(3), read32(read_register(3)))); set_pc(get_pc + 4); end;
-  
+
   // 32 bit opcodes always have %11 set.
   case opcode(inst) of
     $03: execute_load      (inst);
     $13: execute_immediate (inst);
-    $17: execute_auipc     (inst);    
+    $17: execute_auipc     (inst);
     $23: execute_store     (inst);
     $33: execute_register  (inst);
     $37: execute_lui       (inst);
     $63: execute_branch    (inst);
     $67: execute_jalr      (inst);
-    $6F: execute_jal       (inst);    
+    $6F: execute_jal       (inst);
   else
     set_pc(get_pc + 4); // Skip unknown opcodes
-  end;  
+  end;
 end;
 
 // ----------------------------------------------------------------------------
@@ -645,60 +646,60 @@ procedure writeregister;
 var i : integer;
 begin
 //  for i := 0 to 15 do write(i:8, ' '); writeln;
-  for i := 0 to 15 do write(dword2hex(registers[i]), ' ');//  writeln;    
+  for i := 0 to 15 do write(dword2hex(registers[i]), ' ');//  writeln;
 //  for i := 16 to 31 do write(i:8, ' '); writeln;
-//  for i := 16 to 31 do write(dword2hex(registers[i]), ' '); writeln;      
+//  for i := 16 to 31 do write(dword2hex(registers[i]), ' '); writeln;
 end;
 
 var binaryimage : longint;
-    binarysize : longint;    
+    binarysize : longint;
     addr, inst : dword;
 
 procedure disassemblebinary;
 begin
   // Disassemble the complete binary
-  
-  writeln;  
+
+  writeln;
   addr := 0;
   while (addr < binarysize) do
   begin
     inst := read32(addr);
     writeln(dword2hex(addr), ' : ', dword2hex(inst), '  ', disassemble(addr, inst));
-    
+
     addr := addr + 4;
   end;
   writeln;
 end;
-    
-    
+
+
 begin
   // Load binary image
-  
+
   fillchar(memory_flash, sizeof(memory_flash), 255);
   fillchar(memory_ram,   sizeof(memory_ram),   255);
-  
+
   binaryimage := fileopen(paramstr(1), fmOpenRead);
-  binarysize := fileseek(binaryimage, 0, fsFromEnd);  
+  binarysize := fileseek(binaryimage, 0, fsFromEnd);
   writeln('Binary size: ', binarysize, ' bytes.');
-  fileseek(binaryimage, 0, fsFromBeginning);  
+  fileseek(binaryimage, 0, fsFromBeginning);
   fileread(binaryimage, memory_flash[0], binarysize);
   fileclose(binaryimage);
-  
+
   // disassemblebinary;
-    
+
   // Execute !
-  
+
   writeln('Ready to fly !');
   set_pc(read32(4) + $400 - 1);
   writeln('Start address: ', dword2hex(get_pc));
-  
-  //for i := 1 to 1000 do // Maximum amount of instructions... 
-  //begin  
+
+  //for i := 1 to 1000 do // Maximum amount of instructions...
+  //begin
   repeat
     // writeregister; writeln(dword2hex(get_pc), ' : ', dword2hex(read32(get_pc)), '  ', disassemble(get_pc, read32(get_pc))); writeln;
     // write(dword2hex(get_pc), ' ', dword2hex(read32(get_pc)), ' : '); writeregister; writeln(disassemble(get_pc, read32(get_pc)));
-    execute;    
+    execute;
   until false;
   //end;
-    
+
 end.

@@ -26,14 +26,3 @@ flashstore:
   lw x8, 4(x9)
   addi x9, x9, 8
   ret
-
-# -----------------------------------------------------------------------------
-  Definition Flag_inline, "hflash!" # ( x 16-addr -- )
-# Given a value 'x' and a 2-aligned address 'addr', stores 'x' to memory at 'addr', consuming both.
-# -----------------------------------------------------------------------------
-hflashstore:
-  lw x15, 0(x9)
-  sh x15, 0(x8)
-  lw x8, 4(x9)
-  addi x9, x9, 8
-  ret

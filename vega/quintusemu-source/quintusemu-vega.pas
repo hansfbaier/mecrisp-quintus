@@ -417,6 +417,7 @@ end;
 
 function disassemble(addr, inst : dword) : string;
 begin
+  disassemble := '';
   // 32 bit opcodes always have %11 set.
   case opcode(inst) of
     $03: disassemble := disassemble_load      (addr, inst);

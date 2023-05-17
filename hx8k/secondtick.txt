@@ -1,0 +1,19 @@
+
+$400010 constant port-in
+$400020 constant port-out
+$400040 constant port-dir
+$400080 constant port-leds
+
+$440000 constant ticks
+$480000 constant reload
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: tick ( -- ) 1 port-leds toggle ;
+
+' tick irq-collection !
+
+  -30000000 reload !     \ Reload value for timer which counts up and triggers interrupt on overflow.
+         -1 ticks  ! eint \ Trigger interrupt now by setting the cycle counter.

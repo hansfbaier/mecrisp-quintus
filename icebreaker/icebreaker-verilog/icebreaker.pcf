@@ -1,5 +1,5 @@
 # 12 MHz clock
-set_io clk        35
+set_io oscillator 35
 
 # RS232
 set_io ser_rx      6

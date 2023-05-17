@@ -309,3 +309,13 @@
            \/___/\/___/\/___/\/___/  Veronica Karlsson
 
     We are very close to the 1.0.0 release now!
+
+
+09.10.2022, Matthias Koch, Mecrisp-Quintus 1.0.0
+
+  - Wrote glossary
+  - Tidied up common verilog sources
+  - Rewrote HX8K target to use FemtoRV32-Gracilis
+  - Removed old PicoRV based Icebreaker port
+  - Added binary with included acrobatics compiler for Icebreaker
+  - Fixed alignment issues with inline cache access in acrobatics compiler

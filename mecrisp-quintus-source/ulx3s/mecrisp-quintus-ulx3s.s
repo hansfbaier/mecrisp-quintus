@@ -83,7 +83,7 @@ Reset: # Forth begins here
 
   call uart_init
 
-  welcome " for RISC-V 32 IMC on ULX3S by Matthias Koch"
+  welcome " for RISC-V RV32IMC on ULX3S by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"

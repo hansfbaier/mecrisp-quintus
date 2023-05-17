@@ -1,6 +1,12 @@
 
+$40000080 constant leds-out
+
 $40040000 constant ticks
 $40080000 constant reload
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
 
 : tick ( -- ) 2 leds-out toggle ;
 

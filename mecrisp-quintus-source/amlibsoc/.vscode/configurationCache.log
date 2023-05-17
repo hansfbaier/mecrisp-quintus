@@ -1,0 +1,1 @@
+{"buildTargets":["all","clean","mecrisp-quintus-icebreaker.bin","mecrisp-quintus-icebreaker.o"],"launchTargets":["/home/jack/forth/mecrisp-quintus-0.37-experimental/mecrisp-quintus-source/amlibsoc>mecrisp-quintus-icebreaker.elf()"],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}

@@ -1,38 +1,63 @@
 
-How to install and use :
+--------------------------------------------------------------------------------
+Mecrisp-Quintus for HX1K Icestick, containing FemtoRV32-Gracilis (RV32IMC).
+--------------------------------------------------------------------------------
+
+The included bitstream contains a FemtoRV32-Gracilis core which is synthesised
+with 128 kb RAM, hardware multiply & divide and compressed instruction support.
+
+See https://github.com/BrunoLevy/learn-fpga
+and https://github.com/BrunoLevy/learn-fpga/tree/master/FemtoRV/RTL/PROCESSOR
+
+How to flash:
 
 iceprog icebreaker.bin
-iceprog -o 1M mecrisp-quintus-icebreaker-with-tools.bin
+iceprog -o 128k mecrisp-quintus-icebreaker-with-tools.bin
+
+How to communicate:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 400 -n"
+  or
 ./terminal
+
+The board has a dedicated Reset button.
+
+Processor runs at 12 MHz and everything is copied to RAM for fast execution.
+
+You can also run the binary in emulator:
+
+./quintusemu-icebreaker mecrisp-quintus-icebreaker-with-tools.bin
+
+--------------------------------------------------------------------------------
 
 Memory map:
 
-$00000000 - $00000FFF:  4 kb RAM
-$00001000 - $0000AFFF: 40 kb RAM, containing mirrored Flash contents
-$00100000 - $00200000: SPI Flash memory, slow.
+$00000000 - $0000FFFF: 64 kb RAM
+$00010000 - $0001FFFF: 64 kb RAM, containing mirrored Flash contents
+$00800000 - $008FFFFF: SPI Flash memory, slow.
+
+--------------------------------------------------------------------------------
 
 IO Registers:
 
-  $20000010: PORTA IN
-  $20000020: PORTA OUT
-  $20000040: PORTA DIR
-  $20000080: LEDs
+$400010 constant port-in    [24] Random bit [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400020 constant port-out                   [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400040 constant port-dir                   [23:16] PMOD2 [15:8] PMOD1B [7:0] PMOD1A
+$400080 constant port-leds                                              [1:0] Two LEDs
 
-  $20000100: PORTB IN
-  $20000200: PORTB OUT
-  $20000400: PORTB DIR
+$410000 constant uart-data   [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$420000 constant uart-status [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+$440000 constant ticks       Timer ticks, generates interrupt on overflow from $FFFFFFFF
+$480000 constant reload      Timer reload value on overflow
 
-  $20001000: PORTC IN
-  $20002000: PORTC OUT
-  $20004000: PORTC DIR
+The IO registers have atomic clear/set/toggle capability:
 
-  $20010000: UART RX / TX
-  $20020000: Random, TX Flag, RX Flag
-  $20040000: Cycle counter
-  $20080000: Cycle counter reload value on overflow
+  Address +  0 : Normal write
+  Address +  4 : Clear bits
+  Address +  8 : Set bits
+  Address + 12 : Toggle bits
 
-PicoRV is configured without qreg support, and I changed the registers
-for interrupt return and interrupt cause to x30 and x31, respectively.
-
-The cycle counter counts up, triggers an interrupt on overflow and
+The ticks counter counts up, triggers an interrupt on overflow and
 loads the value from the reload register, which defaults to 0.
+
+--------------------------------------------------------------------------------

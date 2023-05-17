@@ -9,7 +9,7 @@ Disassembly of section .text:
 	...
 
 00000004 <Boot>:
-   4:	00100437          	lui	x8,0x100
+   4:	00840437          	lui	x8,0x840
    8:	4481                	li	x9,0
    a:	10000513          	li	x10,256
    e:	400c                	lw	x11,0(x8)
@@ -22,8 +22,8 @@ Disassembly of section .text:
   1e:	02240067          	jr	34(x8) # 22 <Reset>
 
 00000022 <Reset>:
-  22:	20000437          	lui	x8,0x20000
-  26:	08040413          	addi	x8,x8,128 # 20000080 <leds>
+  22:	00400437          	lui	x8,0x400
+  26:	08040413          	addi	x8,x8,128 # 400080 <leds>
   2a:	4505                	li	x10,1
   2c:	01351593          	slli	x11,x10,0x13
 

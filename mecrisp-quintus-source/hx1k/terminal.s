@@ -49,8 +49,8 @@ serial_emit: # ( c -- ) Emit one character
   popda x15
   beq x15, zero, 1b
 
-  li x14, IO_BASE + IO_UART_DATA
-  sw x8, 0(x14)
+  li x14, IO_BASE
+  sw x8, IO_UART_DATA(x14)
   drop
 
   pop x1
@@ -67,8 +67,8 @@ serial_key: # ( -- c ) Receive one character
   beq x15, zero, 1b
 
   pushdatos
-  li x14, IO_BASE + IO_UART_DATA
-  lw x8, 0(x14)
+  li x14, IO_BASE
+  lw x8, IO_UART_DATA(x14)
   andi x8, x8, 0xFF
 
   pop x1
@@ -82,8 +82,8 @@ serial_qemit:  # ( -- ? ) Ready to send a character ?
   call pause
 
   pushdatos
-  li x8, IO_BASE + IO_UART_CNTL
-  lw x8, 0(x8)
+  li x8, IO_BASE
+  lw x8, IO_UART_CNTL(x8)
   andi x8, x8, 0x200
 
   sltiu x8, x8, 1 # 0=
@@ -100,8 +100,8 @@ serial_qkey:  # ( -- ? ) Is there a key press ?
   call pause
 
   pushdatos
-  li x8, IO_BASE + IO_UART_CNTL
-  lw x8, 0(x8)
+  li x8, IO_BASE
+  lw x8, IO_UART_CNTL(x8)
   andi x8, x8, 0x100
 
   sltiu x8, x8, 1 # 0<>

@@ -63,7 +63,7 @@ Reset: # Forth begins here
 
   call uart_init
 
-  welcome " for RISC-V 32 I on HX1K by Matthias Koch"
+  welcome " for RISC-V RV32I on HX1K by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"

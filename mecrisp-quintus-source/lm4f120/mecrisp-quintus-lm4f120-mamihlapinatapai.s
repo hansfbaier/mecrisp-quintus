@@ -70,7 +70,7 @@ Reset: # Forth begins here, directly after the emulator binary
 
   call uart_init
 
-  welcome " for emulated RISC-V 32 IM with Mamihlapinatapai on LM4F120 by Matthias Koch"
+  welcome " for emulated RISC-V RV32IM with Mamihlapinatapai on LM4F120 by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"

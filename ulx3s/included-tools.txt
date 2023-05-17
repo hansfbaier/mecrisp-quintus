@@ -1615,6 +1615,9 @@ $40002000 constant oled-out
 $40004000 constant oled-dir
 $40008000 constant analog-out
 
+$40040000 constant ticks
+$40080000 constant reload
+
 $40100000 constant adc-in
 $40200000 constant adc-out
 $40400000 constant sd-in

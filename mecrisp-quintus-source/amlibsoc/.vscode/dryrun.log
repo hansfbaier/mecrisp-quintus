@@ -1,0 +1,8 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/jack/forth/mecrisp-quintus-0.37-experimental/mecrisp-quintus-source/amlibsoc'
+riscv64-linux-gnu-as mecrisp-quintus-icebreaker.s -o mecrisp-quintus-icebreaker.o -march=rv32im
+riscv64-linux-gnu-ld -o mecrisp-quintus-icebreaker.elf -T memmap mecrisp-quintus-icebreaker.o -m elf32lriscv
+riscv64-linux-gnu-objdump -Mnumeric -D mecrisp-quintus-icebreaker.elf > mecrisp-quintus-icebreaker.list
+riscv64-linux-gnu-objcopy mecrisp-quintus-icebreaker.elf mecrisp-quintus-icebreaker.bin -O binary
+make: Leaving directory '/home/jack/forth/mecrisp-quintus-0.37-experimental/mecrisp-quintus-source/amlibsoc'
+ 

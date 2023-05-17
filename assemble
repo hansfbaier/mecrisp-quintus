@@ -24,17 +24,6 @@ fi
 
 # -----------------------------------------------------------------------------
 
-if [[ -z "$1" || "$1" = "icebreaker-femtorv32" ]]
-then
-cd mecrisp-quintus-source/icebreaker-femtorv32
-make clean all
-cp *.bin ../../icebreaker-femtorv32
-make clean
-cd ../..
-fi
-
-# -----------------------------------------------------------------------------
-
 if [[ -z "$1" || "$1" = "lm4f120" ]]
 then
 cd mecrisp-quintus-source/mamihlapinatapai

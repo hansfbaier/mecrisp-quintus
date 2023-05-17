@@ -36,8 +36,8 @@
 
 # Konstanten für die Größe und Aufteilung des Flash-Speichers
 
-.equ FlashAnfang, 0x00100000 # Start of Flash          Porting: Change this !
-.equ FlashEnde,   0x00110000 # End   of Flash.  64 kb. Porting: Change this !
+.equ FlashAnfang, 0x00840000 # Start of Flash          Porting: Change this !
+.equ FlashEnde,   0x00850000 # End   of Flash.  64 kb. Porting: Change this !
 
 .equ FlashDictionaryAnfang, FlashAnfang + 0x4400 # 17 kb reserved for core.
 .equ FlashDictionaryEnde,   FlashEnde
@@ -47,8 +47,6 @@
 # -----------------------------------------------------------------------------
 
 .text
-  j irq_collection
-  .balign 4, 0
   j Reset
 
 # -----------------------------------------------------------------------------
@@ -64,7 +62,9 @@ Reset: # Forth begins here
 
   call uart_init
 
-  welcome " for RISC-V 32 IMC on HX8K by Matthias Koch"
+  welcome " for RISC-V RV32IMC on HX8K by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"
+
+.org 0x10000, 0xFF

@@ -16,23 +16,22 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-.include "interrupts.s"
+.include "../common/interrupt-femtorv.s"
 .include "../common/terminalhooks.s"
 
 # -----------------------------------------------------------------------------
 # Labels for a few hardware ports
 # -----------------------------------------------------------------------------
 
-.equ spictrl,       0x02000000  # SPI Flash Controller Config Register
-
-.equ leds,          0x20000080
-.equ uart_data,     0x20010000
-.equ uart_flags,    0x20020000
+.equ uart_data,     0x00410000
+.equ uart_flags,    0x00420000
 
 # -----------------------------------------------------------------------------
 uart_init:
 # -----------------------------------------------------------------------------
-  j dint # Just enable error interrupts and disable all other interrupt sources
+  la x15, irq_collection
+  csrrw zero, mtvec, x15  # MTVEC: Store address of exception handler
+  ret
 
 # -----------------------------------------------------------------------------
   Definition Flag_visible, "serial-emit"
@@ -64,6 +63,7 @@ serial_key: # ( -- c ) Receive one character
   pushdatos
   li x14, uart_data
   lw x8, 0(x14)
+  andi x8, x8, 0xFF
 
   pop x1
   ret
@@ -78,9 +78,10 @@ serial_qemit:  # ( -- ? ) Ready to send a character ?
   pushdatos
   li x8, uart_flags
   lw x8, 0(x8)
+  andi x8, x8, 0x200
 
-  slli x8, x8, 31
-  srai x8, x8, 31
+  sltiu x8, x8, 1 # 0=
+  sub x8, zero, x8
 
   pop x1
   ret
@@ -95,22 +96,16 @@ serial_qkey:  # ( -- ? ) Is there a key press ?
   pushdatos
   li x8, uart_flags
   lw x8, 0(x8)
+  andi x8, x8, 0x100
 
-  slli x8, x8, 30
-  srai x8, x8, 31
+  sltiu x8, x8, 1 # 0<>
+  addi x8, x8, -1
 
   pop x1
   ret
 
 # -----------------------------------------------------------------------------
-  Definition Flag_visible, "leds"
-# -----------------------------------------------------------------------------
-  li x14, leds
-  sw x8, 0(x14)
-  drop
-  ret
-
-# -----------------------------------------------------------------------------
   Definition Flag_visible, "reset"
 # -----------------------------------------------------------------------------
+  csrrci zero, mstatus, 8 # Clear Machine Interrupt Enable Bit
   j Reset

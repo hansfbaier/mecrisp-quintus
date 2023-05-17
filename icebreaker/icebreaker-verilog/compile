@@ -1,7 +1,19 @@
 #!/bin/bash
 
+mkdir -p build
 rm -f build/*
 
-yosys -q -p "synth_ice40 -top icebreaker -json build/icebreaker.json -blif build/icebreaker.blif -dsp -relut -abc2" ice40up5k_spram.v icebreaker.v uart-fifo.v spimemio.v picosoc.v picorv32.v
-nextpnr-ice40 --freq 12 --up5k --package sg48 --asc build/icebreaker.asc --pcf icebreaker.pcf --json build/icebreaker.json --force --pcf-allow-unconstrained
-icepack build/icebreaker.asc icebreaker.bin
+echo "Synthesize design..."
+
+if
+  yosys  -q -p "synth_ice40 -top icebreaker -json build/icebreaker.json -blif build/icebreaker.blif -dsp -abc2 -relut -no-rw-check" icebreaker.v;
+then
+  echo "Place and Route..."
+  nextpnr-ice40 --freq 12 --up5k --package sg48 --asc build/icebreaker.txt --pcf icebreaker.pcf --json build/icebreaker.json --ignore-loops --pcf-allow-unconstrained --seed 11
+  echo "Create Bitstream..."
+  icepack build/icebreaker.txt build/icebreaker0.bin -s
+  icemulti -p0 build/icebreaker0.bin > icebreaker.bin
+  echo "Finished."
+fi
+
+rm -f build/*

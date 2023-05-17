@@ -117,7 +117,7 @@ Reset: # Forth begins here
   call uart_init            # terminal.s
   call interrupt_init       # interrupts.s
 
-  welcome " for PIC32MX270F256B by Matthias Koch"
+  welcome " for MIPS on PIC32MX270F256B by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"

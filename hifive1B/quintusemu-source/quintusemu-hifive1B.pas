@@ -84,7 +84,7 @@ begin
   if flash(addr) then read16 := memory_flash[addr] or
                                 memory_flash[addr + 1] shl 8;
   if   ram(addr) then read16 :=   memory_ram[addr - $80000000] or
-                                  memory_ram[addr + 1 - $80000000] shl 8;                 
+                                  memory_ram[addr + 1 - $80000000] shl 8;
 end;
 
 function read32(addr : dword) : dword;
@@ -125,7 +125,7 @@ begin
                         memory_flash[addr+1] := (data shr  8) and $FF;
                       end;
   if   ram(addr) then begin
-                          memory_ram[addr   - $80000000] :=  data         and $FF; 
+                          memory_ram[addr   - $80000000] :=  data         and $FF;
                           memory_ram[addr+1 - $80000000] := (data shr  8) and $FF;
                       end;
 end;
@@ -138,11 +138,11 @@ begin
 
       $10013000: emit(data and $FF);    // UART_TXDATA
 
-  
+
     $DABBAD00: begin // Special helper to generate binaries with precompiled sources.
                  filecreate('coredump.bin');
                  coredump := fileopen('coredump.bin', fmOpenWrite);
-                 filewrite(coredump, memory_flash[$20010000], data-$20010000);  
+                 filewrite(coredump, memory_flash[$20010000], data-$20010000);
                  fileclose(coredump);
                  halt;
                end;
@@ -503,6 +503,7 @@ end;
 function disassemble(addr, inst : dword) : string;
 var rvc_inst : word;
 begin
+  disassemble := '';
   rvc_inst := inst and $FFFF;
 
   case rvc_inst and 3 of
@@ -964,7 +965,7 @@ begin
   set_pc($20010000);
   writeln('Start address: ', dword2hex(get_pc));
 
-  //for i := 1 to 1000 do // Maximum amount of instructions... 
+  //for i := 1 to 1000 do // Maximum amount of instructions...
  // begin
   repeat
     // writeregister; writeln(dword2hex(get_pc), ' : ', dword2hex(read32(get_pc)), '  ', disassemble(get_pc, read32(get_pc))); writeln;

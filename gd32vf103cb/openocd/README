@@ -1,0 +1,52 @@
+
+How to flash mecrisp-quintus using riscv-openocd
+for GD32vf103cb longan nano (and Sipeed JTAG programmer)
+i)
+download and install risc-v openocd :
+"apt-get install" "dnf install" these packages
+- libtool pkg-config git autoconf automake texinfo
+- libusb-devel
+git clone --recursive https://github.com/riscv/riscv-openocd.git
+cd riscv-openocd
+./bootstrap nosubmodule
+./configure --prefix=/opt/riscv/
+make -j8
+sudo make install
+
+be sure it's installed doing riscv-openocd -v
+
+ii) ok now install riscv gdb from (riscv-toolchain)
+git clone --recursive https://github.com/riscv-collab/riscv-gnu-toolchain.git
+cd riscv-gnu-toolchain
+mkdir /opt/riscv
+./configure --prefix=/opt/riscv --enable-multilib --with-cmodel=medany
+make -j8
+sudo make install
+
+be sure it's installed doing riscv32-unknown-elf-gdb -v
+
+iii) Flashing
+Plug-in the programmer'wires to the longan nano : 3v3 -> 3v3 ; Gnd -> Gnd ; TDI -> TJDI ; Rxd-> T0;...etc
+lsusb
+you should see (0403:6010) FT2232 Dual Uart... if not : replug/ reboot
+
+open 2 terminals : on the first one :
+cd <your directories>/mecrisp-quintus-x/gd32vf103cb
+riscv-openocd -f openocd_gd32vf103cb.cfg
+you should see "Info : starting gdb server for riscv.cpu on 3333"
+
+on the second terminal:
+riscv32-unknown-elf-gdb
+target remote:3333
+monitor flash banks
+> #0 : riscv.flash (stm32f1x) at 0x08000000, size 0x00020000, buswidth 0, chipwidth 0
+replace N with the number you see after # in the next commands:
+monitor flash write_bank N mecrisp-quintus-gd32vf103cb.bin
+
+if everything went well you should see
+wrote 18880 bytes from file mecrisp-quintus-gd32vf103cb.bin to flash bank 0 at offset 0x00000000 in 1.093859s (16.855 KiB/s)
+
+if you have error flashing : quit gdb (C-C, C-D, y enter), relaunch openocd and gdb and try again...
+also, before "monitor flash write_bank" command, you can try
+monitor flash erase_sector N 0 127 (replace N with 0)
+

@@ -84,7 +84,7 @@ Reset: # Forth begins here
 #  li x11, UART0_TXDATA
 #  sw x10, 0(x11)
 
-  welcome " for RISC-V 32 IMC on HiFive1A by Matthias Koch"
+  welcome " for RISC-V RV32IMC on HiFive1A by Matthias Koch"
 
 #  li x10, red|green   # Blue light, active low !
 #  li x11, GPIO_PORT

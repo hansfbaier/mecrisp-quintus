@@ -59,7 +59,7 @@ Reset:
   # Catch the pointers for "Flash" dictionary
   .include "../common/catchflashpointers.s"
 
-  welcome " for RISC-V 32 IM Linux by Matthias Koch"
+  welcome " for RISC-V RV32IM Linux by Matthias Koch"
 
   # Ready to fly !
   .include "../common/boot.s"

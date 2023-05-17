@@ -1,26 +1,64 @@
 
-The included bitstream contains a PicoRV32 core which is synthesised with 14 kb RAM,
-hardware multiply & divide and compressed instruction support.
+--------------------------------------------------------------------------------
+Mecrisp-Quintus for HX8K Breakout, containing FemtoRV32-Gracilis (RV32IMC).
+--------------------------------------------------------------------------------
+
+The included bitstream contains a FemtoRV32-Gracilis core which is synthesised
+with 14 kb RAM, hardware multiply & divide and compressed instruction support.
+
+See https://github.com/BrunoLevy/learn-fpga
+and https://github.com/BrunoLevy/learn-fpga/tree/master/FemtoRV/RTL/PROCESSOR
 
 How to flash:
 
-iceprog -b hx8k-breakout.bin
-iceprog -o 1M mecrisp-quintus-hx8k.bin
+iceprog breakout.bin
+iceprog -o 256k mecrisp-quintus-hx8k-with-tools.bin
 
 How to communicate:
 
-picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 2000 -c 3 -n"
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 500 -c 1 -n"
 
 Reset wire is connected to DTR, press Ctrl+A Ctrl+T to toggle the line and launch Forth.
 
+While the processor runs at 30 MHz, Forth executes from XIP serial flash
+and therefore feels like a crawl.
+
+Firmware that fits into the 14 kb RAM available would run much faster.
+
 You can also run the binary in emulator:
 
-./quintusemu-hx8k mecrisp-quintus-hx8k.bin
+./quintusemu-hx8k mecrisp-quintus-hx8k-with-tools.bin
 
+--------------------------------------------------------------------------------
 
-Picosoc and PicoRV32 are by Clifford Wolf, included here only for convenience.
+For an example firmware that runs entirely in RAM,
+see the tinyblinky examples that can be flashed using
 
-"PicoRV32 is free and open hardware licensed under the ISC license (a license that is similar in terms to the MIT license or the 2-clause BSD license)."
+iceprog -b breakout.bin
+iceprog -o 256k tinyblinky.bin
 
-Get the original here:
-https://github.com/cliffordwolf/picorv32
+--------------------------------------------------------------------------------
+
+IO Registers:
+
+$400010 constant port-in    [24] Random bit [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+$400020 constant port-out                   [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+$400040 constant port-dir                   [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+$400080 constant port-leds                                                   [7:0] Eight LEDs
+
+$410000 constant uart-data   [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$420000 constant uart-status [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+$440000 constant ticks       Timer ticks, generates interrupt on overflow from $FFFFFFFF
+$480000 constant reload      Timer reload value on overflow
+
+The IO registers have atomic clear/set/toggle capability:
+
+  Address +  0 : Normal write
+  Address +  4 : Clear bits
+  Address +  8 : Set bits
+  Address + 12 : Toggle bits
+
+The ticks counter counts up, triggers an interrupt on overflow and
+loads the value from the reload register, which defaults to 0.
+
+--------------------------------------------------------------------------------

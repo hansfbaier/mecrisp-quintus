@@ -5,7 +5,7 @@
 {
    echo -e "compiletoflash\n"
    cat "$3"
-   echo -e "compiletoflash here hex DABBAD00 !\n"
+   echo -e "hex 00850000 DABBAD00 !\n"
    # cat -
 } | "$1" "$2"
 

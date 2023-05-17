@@ -1509,18 +1509,20 @@ true variable constantfoldingpointer
 
 \ -----------------------------------------------------------------------------
 
+: unaligned@ ( addr -- x ) dup h@ swap 2+ h@ 16 lshift or ; \ 2-even access to the inline cache
+
 : kompilator ( addr flags -- )
 
   dup flag-inlinecache and
   if \ Wenn die Optimiersequenz geschrieben worden ist, ist auch mindestens ein Element darin vorhanden.
     drop ( addr ) skipdefinition
 
-          dup @ ( Cache-Start Zahl-der-Elemente )
+          dup unaligned@ ( Cache-Start Zahl-der-Elemente )
           swap 4 + swap
           0 do
             >r
-            r@     @   \ Addr
-            r@ 4 + @   \ Flags
+            r@     unaligned@   \ Addr
+            r@ 4 + unaligned@   \ Flags
             recurse
             r> 8 +
           loop

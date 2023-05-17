@@ -13,6 +13,7 @@ Interrupts on GD32VF103 by Wolfgang Strauss
 Conditional compilation, Forth 200x style by Manfred Mahlow
 Femtosoc and the FemtoRV32 processor for HX1K by Bruno Levy
 ASCII Art by Veronica Karlsson
+OpenOCD flashing instructions for GD32VF103 by Theo Zanibellato
 
 Hardware donations:
 
@@ -26,6 +27,7 @@ Testing and hints in alphabetical order:
 
 Martin Bitter
 Paul Boddie
+Robert Clausecker
 Michael Kalus
 Manfred Mahlow
 Ingolf Pohl
@@ -36,7 +38,6 @@ Erich Wäldle
 
 Inspiring projects:
 
-PicoRV32 and Picosoc by Clifford Wolf (https://github.com/cliffordwolf/picorv32)
 Logic tricks from the book Hacker's Delight (http://www.hackersdelight.org/)
 PIC32 VGA assembler code by Paul Boddie (https://blogs.fsfe.org/pboddie/?p=1712)
 Femtosoc and FemtoRV32 by Bruno Levy https://github.com/BrunoLevy/learn-fpga/

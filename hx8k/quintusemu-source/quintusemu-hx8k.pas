@@ -58,7 +58,7 @@ begin
   key := character;
 end;
 
-var memory : array[0..$00200000] of byte;
+var memory : array[0..$00900000] of byte;
 
 function read8 (addr : dword) : dword;
 begin
@@ -67,15 +67,19 @@ end;
 
 function read16(addr : dword) : dword;
 begin
+  if (addr and 1) <> 0 then writeln('Unaligned 16 bit load ', dword2hex(addr));
+
   read16 := memory[addr] or
             memory[addr + 1] shl 8;
 end;
 
 function read32(addr : dword) : dword;
 begin
+  if (addr and 3) <> 0 then writeln('Unaligned 32 bit load ', dword2hex(addr));
+
   case addr of
-    $20020000: read32 := 3;           // UART Flags Register
-    $20010000: read32 := key;         // UART Data Register
+    $00420000: read32 := $100;        // UART Flags Register
+    $00410000: read32 := key;         // UART Data Register
   else
     read32 := memory[addr] or
               memory[addr + 1] shl  8  or
@@ -92,6 +96,8 @@ end;
 
 procedure store16(addr, data : dword);
 begin
+  if (addr and 1) <> 0 then writeln('Unaligned 16 bit store ', dword2hex(addr), ' ', dword2hex(data));
+
   memory[addr  ] :=  data         and $FF;
   memory[addr+1] := (data shr  8) and $FF;
 end;
@@ -99,18 +105,19 @@ end;
 procedure store32(addr, data : dword);
 var coredump : longint;
 begin
-  // writeln('Store32 ', dword2hex(addr), ' ', dword2hex(data));
+  if (addr and 3) <> 0 then writeln('Unaligned 32 bit store ', dword2hex(addr), ' ', dword2hex(data));
+
   case addr of
 
     $DABBAD00: begin // Special helper to generate binaries with precompiled sources.
                  filecreate('coredump.bin');
                  coredump := fileopen('coredump.bin', fmOpenWrite);
-                 filewrite(coredump, memory[$100000], data - $100000);
+                 filewrite(coredump, memory[$00840000], data - $00840000);
                  fileclose(coredump);
                  halt;
                end;
 
-    $20010000: emit(data and $FF);  // UART Data Register
+    $00410000: emit(data and $FF);  // UART Data Register
   else
     memory[addr  ] :=  data         and $FF;
     memory[addr+1] := (data shr  8) and $FF;
@@ -459,6 +466,7 @@ end;
 function disassemble(addr, inst : dword) : string;
 var rvc_inst : word;
 begin
+  disassemble := '';
   rvc_inst := inst and $FFFF;
 
   case rvc_inst and 3 of
@@ -843,7 +851,9 @@ begin
        end;
 
   else
-    inst := read32(get_pc);
+    // Compressed instructions can be fetched on 2-even boundaries
+    inst := (read16(get_pc + 2) shl 16) or read16(get_pc);
+
     // 32 bit opcodes always have %11 set.
     case opcode(inst) of
       $03: execute_load      (inst);
@@ -887,8 +897,8 @@ begin
   // Disassemble the complete binary
 
   writeln;
-  addr := $100000;
-  while (addr < $100000 + binarysize) do
+  addr := $00840000;
+  while (addr < $00840000 + binarysize) do
   begin
     inst := read32(addr);
     writeln(dword2hex(addr), ' : ', printopcode, '  ', disassemble(addr, inst));
@@ -908,7 +918,7 @@ begin
   binarysize := fileseek(binaryimage, 0, fsFromEnd);
   writeln('Binary size: ', binarysize, ' bytes.');
   fileseek(binaryimage, 0, fsFromBeginning);
-  fileread(binaryimage, memory[$100000], binarysize);
+  fileread(binaryimage, memory[$00840000], binarysize);
   fileclose(binaryimage);
 
   // disassemblebinary;
@@ -916,7 +926,7 @@ begin
   // Execute !
 
   writeln('Ready to fly !');
-  set_pc($100004);
+  set_pc($00840000);
 
  // for i := 1 to 10000000 do // Maximum amount of instructions...
  // begin

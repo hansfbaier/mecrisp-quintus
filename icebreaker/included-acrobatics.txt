@@ -1509,18 +1509,20 @@ true variable constantfoldingpointer
 
 \ -----------------------------------------------------------------------------
 
+: unaligned@ ( addr -- x ) dup h@ swap 2+ h@ 16 lshift or ; \ 2-even access to the inline cache
+
 : kompilator ( addr flags -- )
 
   dup flag-inlinecache and
   if \ Wenn die Optimiersequenz geschrieben worden ist, ist auch mindestens ein Element darin vorhanden.
     drop ( addr ) skipdefinition
 
-          dup @ ( Cache-Start Zahl-der-Elemente )
+          dup unaligned@ ( Cache-Start Zahl-der-Elemente )
           swap 4 + swap
           0 do
             >r
-            r@     @   \ Addr
-            r@ 4 + @   \ Flags
+            r@     unaligned@   \ Addr
+            r@ 4 + unaligned@   \ Flags
             recurse
             r> 8 +
           loop
@@ -2048,7 +2050,7 @@ normal-inlining
 
 \ -----------------------------------------------------------------------------
 
-\ RISC-V 32 IM Disassembler, Copyright (C) 2018  Matthias Koch
+\ RISC-V 32 IMC Disassembler, Copyright (C) 2018  Matthias Koch
 \ This is free software under GNU General Public License v3.
 \ Usage: Specify your target address in disasm-$ and give disasm-step some calls.
 
@@ -2077,7 +2079,18 @@ normal-inlining
 \ --------------------------------------------------
 
 : disasm-string ( -- ) \ Takes care of an inline string
-  disasm-$ @ 4 + dup ctype skipstring 4 - disasm-$ !
+
+  disasm-$ @
+
+  \ Skip opcode, print string and find correct location to continue
+  \ Disassembler is adding the opcode length later, therefore the subtraction
+
+  dup h@
+  3 and 3 = if   4 + dup ctype skipstring 4 -
+            else 2 + dup ctype skipstring 2 -
+            then
+
+  disasm-$ !
 ;
 
 : name. ( Address -- ) \ If the address is Code-Start of a dictionary word, it gets named.
@@ -2121,7 +2134,7 @@ normal-inlining
 \  Disassembler logic and opcode cutters
 \ ----------------------------------------
 
-: inst ( -- x ) disasm-$ @ @ ;
+: inst ( -- x ) disasm-$ @ dup 2 + h@ 16 lshift swap h@ or ; \ Unaligned 32 bit fetch
 
 : funct3 ( -- x ) inst 12 rshift $07 and ;
 : funct7 ( -- x ) inst 25 rshift ;
@@ -2300,7 +2313,155 @@ normal-inlining
   then
 ;
 
+\ -------------------------------------------
+\  Compressed instruction set opcode cutters
+\ -------------------------------------------
+
+: rvc-inst  ( -- x ) disasm-$ @ h@ ;
+: rvc-func3 ( -- x ) rvc-inst 13 rshift ;
+: rvc-reg.  ( x -- ) 7 and 8 + register. ;
+
+: imm_css   ( -- x )
+                     rvc-inst  7 rshift   3 and  6 lshift
+                     rvc-inst  9 rshift  $F and  2 lshift or ;
+
+: imm_csl   ( -- x )
+                     rvc-inst 12 rshift   1 and  5 lshift
+                     rvc-inst  2 rshift   3 and  6 lshift or
+                     rvc-inst  4 rshift   7 and  2 lshift or ;
+
+: imm_cu    ( -- x ) rvc-inst  2 rshift $1F and
+                     rvc-inst 12 rshift   1 and  5 lshift or ;
+
+: imm_c     ( -- x ) rvc-inst  2 rshift $1F and
+                     rvc-inst 12 rshift   1 and  5 lshift or  26 lshift 26 arshift ;
+
+: imm_clwsw ( -- x ) rvc-inst  5 rshift   1 and  6 lshift
+                     rvc-inst  6 rshift   1 and  2 lshift or
+                     rvc-inst 10 rshift   7 and  3 lshift or ;
+
+: imm_cj    ( -- x ) rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   7 and  1 lshift or
+                     rvc-inst  6 rshift   1 and  7 lshift or
+                     rvc-inst  7 rshift   1 and  6 lshift or
+                     rvc-inst  8 rshift   1 and 10 lshift or
+                     rvc-inst  9 rshift   3 and  8 lshift or
+                     rvc-inst 11 rshift   1 and  4 lshift or
+                     rvc-inst 12 rshift   1 and 11 lshift or  20 lshift 20 arshift ;
+
+: imm_cb    ( -- x ) rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   3 and  1 lshift or
+                     rvc-inst  5 rshift   3 and  6 lshift or
+                     rvc-inst 10 rshift   3 and  3 lshift or
+                     rvc-inst 12 rshift   1 and  8 lshift or  23 lshift 23 arshift ;
+
+: imm_addi4spn ( -- x )
+                     rvc-inst  5 rshift   1 and  3 lshift
+                     rvc-inst  6 rshift   1 and  2 lshift or
+                     rvc-inst  7 rshift  $F and  6 lshift or
+                     rvc-inst 11 rshift   3 and  4 lshift or ;
+
+: imm_addi16sp ( -- x )
+                     rvc-inst  2 rshift   1 and  5 lshift
+                     rvc-inst  3 rshift   3 and  7 lshift or
+                     rvc-inst  5 rshift   1 and  6 lshift or
+                     rvc-inst  6 rshift   1 and  4 lshift or
+                     rvc-inst 12 rshift   1 and  9 lshift or ;
+
+
+: disasm-compressed ( -- )
+    rvc-inst 3 and
+    case
+      %00 of
+            rvc-func3
+            case
+              %000 of rvc-inst 0= if ." c.illegal" else
+                  ." c.addi4spn " rvc-inst 2 rshift rvc-reg. ." , " imm_addi4spn . then endof
+              %010 of ." c.lw   " rvc-inst 2 rshift rvc-reg. ." , " imm_clwsw . ." (" rvc-inst 7 rshift rvc-reg. ." )" endof
+              %110 of ." c.sw   " rvc-inst 2 rshift rvc-reg. ." , " imm_clwsw . ." (" rvc-inst 7 rshift rvc-reg. ." )" endof
+              ." Unknown compressed quadrant 0 opcode"
+            endcase
+          endof
+
+      %01 of
+            rvc-func3
+            case
+              %000 of ." c.addi " rvc-inst 7 rshift register. ." , " imm_c . endof
+              %010 of ." c.li   " rvc-inst 7 rshift register. ." , " imm_c . endof
+
+              %110 of ." c.beqz " rvc-inst 7 rshift rvc-reg. ." , " disasm-$ @ imm_cb + u.8 endof
+              %111 of ." c.bnez " rvc-inst 7 rshift rvc-reg. ." , " disasm-$ @ imm_cb + u.8 endof
+
+              %001 of ." c.jal  " disasm-$ @ imm_cj + dup u.8 name. endof
+              %101 of ." c.j    " disasm-$ @ imm_cj + dup u.8 name. endof
+
+              %011 of rvc-inst 7 rshift $1F and 2 =
+                      if   ." c.addi16sp " imm_addi16sp .
+                      else ." c.lui  " rvc-inst 7 rshift register. ." , " imm_c 12 lshift u.8
+                      then
+                   endof
+
+              %100 of
+                     rvc-inst $0C00 and $0000 = if ." c.srli " rvc-inst 7 rshift rvc-reg. ." , " imm_cu . then
+                     rvc-inst $0C00 and $0400 = if ." c.srai " rvc-inst 7 rshift rvc-reg. ." , " imm_cu . then
+                     rvc-inst $0C00 and $0800 = if ." c.andi " rvc-inst 7 rshift rvc-reg. ." , " imm_c  . then
+                     rvc-inst $1C00 and $0C00 =
+                     if
+                       rvc-inst 5 rshift 3 and
+                       case
+                         %00 of ." c.sub  " endof
+                         %01 of ." c.xor  " endof
+                         %10 of ." c.or   " endof
+                         %11 of ." c.and  " endof
+                       endcase
+                       rvc-inst 7 rshift rvc-reg. ." , " rvc-inst 2 rshift rvc-reg.
+                     then
+                   endof
+            endcase
+          endof
+
+      %10 of
+            rvc-func3
+            case
+              %000 of ." c.slli " rvc-inst 7 rshift register. ." , " imm_cu . endof
+              %010 of ." c.lwsp " rvc-inst 7 rshift register. ." , " imm_csl . ." (x2)" endof
+              %110 of ." c.swsp " rvc-inst 2 rshift register. ." , " imm_css . ." (x2)" endof
+
+              %100 of
+                     rvc-inst $1000 and
+                     if
+                       rvc-inst 2 rshift $3FF and 0=
+                       if
+                         ." c.ebreak"
+                       else
+                         rvc-inst 2 rshift $1F and 0=
+                         if   ." c.jalr " rvc-inst 7 rshift register.
+                         else ." c.add  " rvc-inst 7 rshift register. ." , " rvc-inst 2 rshift register.
+                         then
+                       then
+                     else
+                       rvc-inst 2 rshift $1F and 0=
+                       if   ." c.jr   " rvc-inst 7 rshift register.
+                       else ." c.mv   " rvc-inst 7 rshift register. ." , " rvc-inst 2 rshift register.
+                       then
+                     then
+                   endof
+
+              ." Unknown compressed quadrant 2 opcode"
+            endcase
+          endof
+    endcase
+;
+
 : disasm ( -- ) \ Disassembles one machine instruction and advances disasm-$
+
+  inst 3 and 3 <>
+  if \ 2 byte opcodes
+
+    disasm-compressed
+    2 disasm-$ +!
+
+  else \ 4 byte opcodes
 
     inst $7F and
     case
@@ -2318,6 +2479,7 @@ normal-inlining
       ." Unknown opcode"
     endcase
     4 disasm-$ +!
+  then
 ;
 
 \ ------------------------------
@@ -2325,14 +2487,14 @@ normal-inlining
 \ ------------------------------
 
 : memstamp \ ( Addr -- ) Shows a memory location nicely
-    dup u.8 ." : " @ u.8 ."   " ;
+    dup u.8 ." : " h@ u.4 ."   " ;
 
 : disasm-step ( -- )
     disasm-$ @                 \ Note current position
     dup memstamp disasm cr     \ Disassemble one instruction
 
     begin \ Write out all disassembled memory locations
-      4 + dup disasm-$ @ <>
+      2+ dup disasm-$ @ <>
     while
       dup memstamp cr
     repeat
@@ -2349,8 +2511,9 @@ normal-inlining
   begin
     disasm-$ @ addrinflash?
     disasm-$ @ addrinram?    or not
-    disasm-$ @ @ $00008067 = or \ Flag: Loop terminates with ret or when leaving memory area.
-    disasm-$ @ @ $30200073 = or \       Also check for mret
+    rvc-inst $8082 =         or
+    inst $00008067 =         or \ Flag: Loop terminates with ret or when leaving memory area.
+    inst $30200073 =         or \       Also check for mret
     disasm-step
   until
 
@@ -3368,3 +3531,72 @@ boot-task variable up \ User Pointer
   drop
   ."  *>" cr
 ;
+
+: forget ( -- ) \ Usage: forget name, but it will work on definitions in RAM only.
+  ' code>link dup addrinram?
+  if
+    dup @ (latest) !
+    (dp) !
+  else drop then
+;
+
+: del ( -- ) \ Remove the latest definition in RAM.
+  (latest) @ addrinram?
+  if
+    (latest) @ (dp) !
+    (latest) @ @ (latest) !
+  then
+;
+
+: Flamingo cr
+  ."      _" cr
+  ."     ^-)" cr
+  ."      (.._          .._" cr
+  ."       \`\\        (\`\\        (" cr
+  ."        |>         ) |>        |)" cr
+  ." ______/|________ (7 |` ______\|/_______a:f" cr
+;
+
+: welcome ( -- )
+  cr
+  Flamingo
+  cr
+  ." Have a nice day !" cr
+;
+
+$400010 constant port-in
+$400020 constant port-out
+$400040 constant port-dir
+$400080 constant port-leds
+
+$440000 constant ticks
+$480000 constant reload
+
+: clear  ( x addr -- )  4 + ! inline ;
+: set    ( x addr -- )  8 + ! inline ;
+: toggle ( x addr -- ) 12 + ! inline ;
+
+: random ( -- x ) 0 32 0 do 2* port-in @ 24 rshift or loop ;
+
+: leds ( x -- ) port-leds ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 12000 * delay-ticks ;
+: us ( u -- )    12 * delay-ticks ;
+
+[ifdef] init
+  : init ( -- ) init welcome ;
+[else]
+  : init ( -- )      welcome ;
+[then]

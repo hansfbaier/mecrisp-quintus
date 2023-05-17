@@ -522,6 +522,7 @@ end;
 function disassemble(addr, inst : dword) : string;
 var rvc_inst : word;
 begin
+  disassemble := '';
   rvc_inst := inst and $FFFF;
 
   case rvc_inst and 3 of

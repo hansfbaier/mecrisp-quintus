@@ -16,7 +16,8 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Cannot write mapped SPI flash in Icestick, but to precompile in emulator:
+# Cannot write to memory mapped SPI flash in XIP mode,
+# but to precompile in emulator:
 
 # -----------------------------------------------------------------------------
   Definition Flag_visible, "flash!"

@@ -67,12 +67,16 @@ end;
 
 function read16(addr : dword) : dword;
 begin
+  if (addr and 1) <> 0 then writeln('Unaligned 16 bit load ', dword2hex(addr));
+
   read16 := memory[addr] or
             memory[addr + 1] shl 8;
 end;
 
 function read32(addr : dword) : dword;
 begin
+  if (addr and 3) <> 0 then writeln('Unaligned 32 bit load ', dword2hex(addr));
+
   case addr of
     $00400010: read32 := $100;        // UART Flags Register
     $00400008: read32 := key;         // UART Data Register
@@ -92,6 +96,8 @@ end;
 
 procedure store16(addr, data : dword);
 begin
+  if (addr and 1) <> 0 then writeln('Unaligned 16 bit store ', dword2hex(addr), ' ', dword2hex(data));
+
   memory[addr  ] :=  data         and $FF;
   memory[addr+1] := (data shr  8) and $FF;
 end;
@@ -99,7 +105,8 @@ end;
 procedure store32(addr, data : dword);
 var coredump : longint;
 begin
-  // writeln('Store32 ', dword2hex(addr), ' ', dword2hex(data));
+  if (addr and 3) <> 0 then writeln('Unaligned 32 bit store ', dword2hex(addr), ' ', dword2hex(data));
+
   case addr of
 
     $DABBAD00: begin // Special helper to generate binaries with precompiled sources.
@@ -459,6 +466,7 @@ end;
 function disassemble(addr, inst : dword) : string;
 var rvc_inst : word;
 begin
+  disassemble := '';
   rvc_inst := inst and $FFFF;
 
   case rvc_inst and 3 of

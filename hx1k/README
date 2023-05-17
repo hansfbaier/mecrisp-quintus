@@ -1,16 +1,63 @@
 
-Mecrisp-Quintus for running on Icestick containing FemtoSOC by Bruno Levy
-
-The Verilog files for Femtosoc and the FemtoRV32 processor are a contribution by Bruno Levy under BSD license.
+--------------------------------------------------------------------------------
+Mecrisp-Quintus for HX1K Icestick, containing FemtoRV32-Quark (RV32I).
+--------------------------------------------------------------------------------
 
 See https://github.com/BrunoLevy/learn-fpga
-
+and https://github.com/BrunoLevy/learn-fpga/tree/master/FemtoRV/RTL/PROCESSOR
 
 How to install:
 
-iceprog femtosoc.bin
-iceprog -o 64k mecrisp-quintus-hx1k-with-disassembler.bin
+iceprog icestick.bin
+iceprog -o 64k mecrisp-quintus-hx1k-with-tools.bin
 
 How to open a terminal:
 
-picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 400 -c 3 -n"
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 400 -c 1 -n"
+
+Reset wire is connected to DTR, press Ctrl+A Ctrl+T to toggle the line and launch Forth.
+
+While the processor runs at 48 MHz, Forth executes from XIP serial flash
+and therefore feels like a crawl.
+
+Firmware that fits into the 6 kb RAM available would run much faster.
+
+You can also run the binary in emulator:
+
+./quintusemu-hx1k mecrisp-quintus-hx1k-with-tools.bin
+
+--------------------------------------------------------------------------------
+
+   Pinout and board layout:
+
+          /--------------------------------------
+         /                 Header 1:  76543210-+
+        /            ________              ++
+       /            |        |      R      --
+   [USB]  FT        |  FPGA  |    R G R    73   Ir
+   [USB]  DI        |        |      R      62   DA
+       \            |________|             51
+        \                                  40
+         \                 Header 2:  01234567-+
+          \--------------------------------------
+
+     Numbers are bit numbers
+     + is 3.3 V   - is GND
+     G Green LED  R Red LEDs
+
+--------------------------------------------------------------------------------
+
+IO Registers:
+
+$400004 constant port-leds  [4:0] Five LEDs (GRRRR)
+
+$400008 constant uart-data    [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$400010 constant uart-status  [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+
+$400020 constant port-in     [24] Random bit [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+$400040 constant port-out                    [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+$400080 constant port-dir                    [23:16] Header 2 [15:8] Header 1 [7:0] PMOD
+
+$400100 constant port-ir     Write: [0] IR TXD Read: [0] IR RXD
+
+--------------------------------------------------------------------------------

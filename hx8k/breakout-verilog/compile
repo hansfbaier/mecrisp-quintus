@@ -1,0 +1,19 @@
+#!/bin/bash
+
+mkdir -p build
+rm -f build/*
+
+echo "Synthesize design..."
+
+if
+  yosys  -q -p "synth_ice40 -top breakout -json build/breakout.json -blif build/breakout.blif -abc2 -abc9 -relut -no-rw-check" breakout.v;
+then
+  echo "Place and Route..."
+  nextpnr-ice40 --freq 30 --hx8k --package ct256 --asc build/breakout.txt --pcf breakout.pcf --json build/breakout.json --ignore-loops --pcf-allow-unconstrained
+  echo "Create Bitstream..."
+  icepack -s build/breakout.txt build/breakout0.bin
+  icemulti -p0 build/breakout0.bin > breakout.bin
+  echo "Finished."
+fi
+
+rm -f build/*

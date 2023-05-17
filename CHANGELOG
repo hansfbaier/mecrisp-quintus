@@ -333,3 +333,11 @@
 
   - New target: ULX3S-Pipeline-Compressed, featuring FemtoRV32-Pegasus with
     added support for compressed instructions and unaligned instruction fetch
+
+25.02.2023, Matthias Koch, Mecrisp-Quintus 1.0.3
+
+  - New target: Nandland Go
+  - Smaller UARTs in Verilog
+
+  - Contribution by Hans Baier:
+      New target: CH56X

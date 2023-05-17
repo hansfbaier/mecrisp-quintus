@@ -14,6 +14,9 @@ Conditional compilation, Forth 200x style by Manfred Mahlow
 Femtosoc and the FemtoRV32 processor for HX1K by Bruno Levy
 ASCII Art by Veronica Karlsson
 OpenOCD flashing instructions for GD32VF103 by Theo Zanibellato
+Port for CH56X by Hans Baier:
+  https://github.com/hansfbaier/mecrisp-quintus-ch56x-port
+  https://github.com/hansfbaier/mecrisp-quintus-ch56x-boardsupport
 
 Hardware donations:
 

@@ -1,0 +1,71 @@
+
+$10004 constant port-leds
+$10020 constant port-in
+$10040 constant port-out
+$10080 constant port-dir
+
+: random ( -- x ) 0 32 0 do 2* $10010 @ 10 rshift or loop ;
+
+: leds ( x -- ) 14 lshift port-leds @ %000011111111111111 and or port-leds ! ;
+
+: delay-ticks ( ticks -- )
+  cycles ( ticks start )
+  begin
+    pause
+    2dup ( ticks start ticks start )
+    cycles ( ticks start ticks start current )
+    swap - ( ticks start ticks elapsed )
+    u<=
+  until
+  2drop
+;
+
+: ms ( u -- ) 25000 * delay-ticks ;
+: us ( u -- )    25 * delay-ticks ;
+
+\ A small 7 segment display example
+
+binary
+
+create segments
+
+0111111 , \ 0
+0000110 , \ 1
+1011011 , \ 2
+1001111 , \ 3
+1100110 , \ 4
+1101101 , \ 5
+1111101 , \ 6
+0000111 , \ 7
+1111111 , \ 8
+1101111 , \ 9
+1110111 , \ A
+1111100 , \ B
+0111001 , \ C
+1011110 , \ D
+1111001 , \ E
+1110001 , \ F
+
+decimal
+
+: seg.x ( c -- )
+  dup      $F and cells segments + @ swap
+  4 rshift $F and cells segments + @ 7 lshift or
+  port-leds @ %111100000000000000 and or port-leds !
+;
+
+: prompt ( -- )
+  begin
+    highlight
+    query
+    normal
+    interpret
+    ."  ok." cr
+  again
+;
+
+: init ( -- )
+  0 port-leds !
+  page +vga risc-v welcome
+  ['] prompt hook-quit ! quit
+;

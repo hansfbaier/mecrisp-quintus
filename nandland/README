@@ -1,0 +1,64 @@
+
+--------------------------------------------------------------------------------
+  Mecrisp-Quintus for HX1K Nandland Go, containing FemtoRV32-Quark (RV32I).
+--------------------------------------------------------------------------------
+
+See https://github.com/BrunoLevy/learn-fpga
+and https://github.com/BrunoLevy/learn-fpga/tree/master/FemtoRV/RTL/PROCESSOR
+
+How to install:
+
+iceprog -b nandland.bin
+iceprog -o 64k mecrisp-quintus-nandland-with-tools.bin
+
+How to open a terminal:
+
+picocom -b 115200 /dev/ttyUSB1 --imap lfcrlf,crcrlf --omap delbs,crlf --send-cmd "ascii-xfr -s -l 500 -c 1 -n"
+
+Reset the CPU by pressing S2 & S4 at once.
+This does not, however, reload the bitstream with the font memory initialisation.
+
+While the processor runs at 25 MHz, Forth executes from XIP serial flash
+and therefore feels like a crawl.
+
+Firmware that fits into the 2 kb RAM available would run much faster.
+
+You can also run the binary in emulator:
+
+./quintusemu-nandland mecrisp-quintus-nandland-with-tools.bin
+
+--------------------------------------------------------------------------------
+  Memory map and IO
+--------------------------------------------------------------------------------
+
+Memory areas are selected using bits [17:16].
+
+* $00000 - $007FF: 2 kb RAM
+* $10000 - $1FFFF: Peripheral IO registers
+* $20000 - $209FF: 2560 bytes character buffer, 80x30=2400 chars visible, byte access only
+* $20A00 - $20FFF: 1536 bytes font data, 96 characters, 16 bytes per character, byte access only
+* $30000 - $3FFFF: XIP 64 kb SPI flash memory, 64 kb offset from the start
+
+For using the display, all you have is to write characters into the 2400 bytes starting
+at $20000. The font (starting at $20A00) contains 96 glyphs (32 to 127), taken from FreeBSD
+"iso-8x16" bitmap font. The MSB (0x80) selects a "highlight" color.
+
+The ten glyphs for ASCII 22 to 31 are in the invisible part of the character memory area
+from $20960 (=80*30+$20000) to $209FF and can be freely used for custom characters.
+
+Both character and font data areas can be read and written using byte access only.
+
+--------------------------------------------------------------------------------
+  IO Registers
+--------------------------------------------------------------------------------
+
+$10004 constant port-leds   RW [17:14] Four LEDs [13:7] Left segment digit [6:0] Right segment digit
+
+$10008 constant uart-data   RW [10] Random [9] serial_busy [8] serial_valid [7:0] serial_data, transmit/clear side effects
+$10010 constant uart-status RO [10] Random [9] serial_busy [8] serial_valid [7:0] serial_data,             no side effects
+
+$10020 constant port-in     RO [11:8] Buttons [7:0] IN
+$10040 constant port-out    RW                [7:0] OUT
+$10080 constant port-dir    RW                [7:0] DIR
+
+--------------------------------------------------------------------------------

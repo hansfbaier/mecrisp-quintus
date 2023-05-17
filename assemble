@@ -2,6 +2,28 @@
 
 # -----------------------------------------------------------------------------
 
+if [[ -z "$1" || "$1" = "hx1k" ]]
+then
+cd mecrisp-quintus-source/hx1k
+make clean all
+cp *.bin ../../hx1k
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "nandland" ]]
+then
+cd mecrisp-quintus-source/nandland
+make clean all
+cp *.bin ../../nandland
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
 if [[ -z "$1" || "$1" = "hx8k" ]]
 then
 cd mecrisp-quintus-source/hx8k
@@ -165,6 +187,18 @@ then
 cd mecrisp-quintus-source/ulx3s-pipeline-compressed
 make clean all
 cp *.bin ../../ulx3s-pipeline-compressed
+make clean
+cd ../..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "ch56x" ]]
+then
+cd mecrisp-quintus-source/ch56x
+make clean all
+cp *.bin ../../ch56x
+cp *.hex ../../ch56x
 make clean
 cd ../..
 fi

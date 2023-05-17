@@ -1,0 +1,84 @@
+
+\ -----------------------------------------------------------------------------
+\  Text mode with character buffer
+\ -----------------------------------------------------------------------------
+
+$20000 constant characters
+$20A00 constant glyphs
+
+: font! ( x addr -- ) glyphs     + c! ;
+: font@ ( addr -- x ) glyphs     + c@ ;
+
+: char! ( x addr -- ) characters + c! ;
+: char@ ( addr -- x ) characters + c@ ;
+
+\ -----------------------------------------------------------------------------
+\   Character handling for text mode
+\ -----------------------------------------------------------------------------
+
+0 variable xpos
+0 variable ypos
+
+0 variable textmarker
+
+: highlight ( -- )  $80 textmarker ! ;
+: normal    ( -- )    0 textmarker ! ;
+
+0 variable captionchars
+
+: caption ( -- ) \ Fix caption lines when scrolling
+  ypos @ 80 * xpos @ + captionchars !
+;
+
+: nocaption ( -- ) 0 captionchars ! ; \ Remove caption protection
+
+: page ( -- ) \ Clear display
+  2400 captionchars @ do 32 i char! loop
+  captionchars @ 80 /mod ypos ! xpos !
+;
+
+: clrscr ( -- ) page ; \ Just an intuitive alias for page
+
+: addline ( -- )
+  ypos @ 29 < if
+    1 ypos +!
+  else
+    captionchars @ 80 +  characters +
+    captionchars @       characters +
+    2400 captionchars @ - 80 -
+    move
+
+    2320 characters + 80 32 fill
+  then
+  0 xpos !
+;
+
+: addchar ( c -- )
+  textmarker @ or
+  xpos @ 79 > if addline 0 xpos ! then
+  ypos @ 80 * xpos @ + char!
+  1 xpos +!
+;
+
+: stepback ( -- )
+  xpos @
+  if
+    -1 xpos +!
+  else
+    ypos @ if -1 ypos +! 79 xpos ! then
+  then
+;
+
+: vga-emit ( c -- )
+  case
+    10 of addline  endof \ Line Feed
+     8 of stepback endof \ Backspace
+    dup $C0 and $80 <>
+    if dup 127 umin addchar then \ Display block glyph for UTF-8 chars.
+  endcase
+;
+
+: dispatch-emit ( c -- ) dup vga-emit serial-emit ;
+
+: +vga ( -- ) ['] dispatch-emit hook-emit ! ;
+: -vga ( -- ) [']   serial-emit hook-emit ! ;

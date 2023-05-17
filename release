@@ -25,6 +25,29 @@ fi
 
 # -----------------------------------------------------------------------------
 
+if [[ -z "$1" || "$1" = "nandland" ]]
+then
+cd mecrisp-quintus-source/nandland
+make clean all
+cp *.bin ../../nandland
+make clean
+cd ../..
+
+cd nandland
+
+cd quintusemu-source
+fpc -XX -O3 quintusemu-nandland
+mv quintusemu-nandland ..
+rm *.o
+cd ..
+
+cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/forget.txt ../common/flamingo.txt dump.txt textmode.txt welcome.txt > included-tools.txt
+./buildcore ./quintusemu-nandland mecrisp-quintus-nandland.bin included-tools.txt mecrisp-quintus-nandland-with-tools.bin
+cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
 if [[ -z "$1" || "$1" = "hx8k" ]]
 then
 cd mecrisp-quintus-source/hx8k
@@ -357,6 +380,18 @@ cd ..
 cat ../common/conditional.txt ../common/disassembler-rv32im.txt ../common/fixpt-math-lib.fs ../common/dictionary-tools.txt ../common/multitask.txt ../common/multitask-debug.txt basisdefinitions.txt > included.txt
 ./buildcore ./quintusemu-vega mecrisp-quintus-vega.bin included.txt mecrisp-quintus-vega-with-tools.bin
 cd ..
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" || "$1" = "ch56x" ]]
+then
+cd mecrisp-quintus-source/ch56x
+make clean all
+cp *.bin ../../ch56x
+cp *.hex ../../ch56x
+make clean
+cd ../..
 fi
 
 # -----------------------------------------------------------------------------

@@ -186,13 +186,23 @@ ramallot FlashFlags, 4
 .equ Zahlenpufferlaenge, 63 # Zahlenpufferlänge+1 sollte durch 4 teilbar sein !      Number buffer (Length+1 mod 4 = 0)
 ramallot Zahlenpuffer, Zahlenpufferlaenge+1 # Reserviere mal großzügig 64 Bytes RAM für den Zahlenpuffer
 
-  ramallot datenstackende, 512  # Data stack
+.ifndef datastacklength
+  .equ datastacklength, 512
+.endif
+.ifndef returnstacklength
+  .equ returnstacklength, 512
+.endif
+.ifndef tiblength
+  .equ tiblength, 200
+.endif
+
+  ramallot datenstackende, datastacklength  # Data stack
   ramallot datenstackanfang, 0
 
-  ramallot returnstackende, 512  # Return stack
+  ramallot returnstackende, returnstacklength  # Return stack
   ramallot returnstackanfang, 0
 
-.equ Maximaleeingabe,    200             # Input buffer for an Address-Length string
+.equ Maximaleeingabe,   tiblength        # Input buffer for an Address-Length string
 ramallot Eingabepuffer, Maximaleeingabe  # Eingabepuffer wird einen Adresse-Länge String enthalten
 
 .ifdef flash8bytesblockwrite
@@ -237,7 +247,7 @@ ramallot Eingabepuffer, Maximaleeingabe  # Eingabepuffer wird einen Adresse-Län
 .macro welcome Meldung
   call dotgaensefuesschen
         .byte 8f - 7f         # Compute length of string.
-7:      .ascii "Mecrisp-Quintus 1.0.2\Meldung\n"
+7:      .ascii "Mecrisp-Quintus 1.0.3\Meldung\n"
 
 .ifdef compressed_isa
 8:  .balign 2, 0      # Realign
@@ -258,7 +268,7 @@ CoreDictionaryAnfang: # Dictionary-Einsprungpunkt setzen
 .set CoreVariablenPointer, RamDictionaryEnde # Im Flash definierte Variablen kommen ans RAM-Ende
                                              # Variables defined in Flash are placed at the end of RAM
 
-  Definition Flag_invisible, "--- Mecrisp-Quintus 1.0.2 ---"
+  Definition Flag_invisible, "--- Mecrisp-Quintus 1.0.3 ---"
 
 .include "flash.s"
 
